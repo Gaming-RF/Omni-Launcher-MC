@@ -294,64 +294,29 @@ export async function parseCfModpackFile(filePath: string): Promise<ModpackInfo>
 
 // ── Java Management ───────────────────────────────────────────
 
-export interface JavaInstallationInfo {
-  id: string;
-  path: string;
+export interface JavaCheckResult {
+  found: boolean;
+  path: string | null;
   major_version: number;
-  arch: string;
-  vendor: string;
-  is_auto_downloaded: boolean;
+  auto_downloaded: boolean;
+  error: string | null;
 }
 
-export async function detectJavaInstallations(): Promise<JavaInstallationInfo[]> {
-  return invoke("detect_java_installations");
+export async function getRequiredJavaVersion(mcVersion: string): Promise<number> {
+  return invoke("get_required_java_version", { mcVersion });
 }
 
-export async function autoDownloadJava(majorVersion: number): Promise<JavaInstallationInfo> {
-  return invoke("auto_download_java", { majorVersion });
-}
-
-export async function findJavaForMc(mcVersion: string): Promise<JavaInstallationInfo | null> {
-  return invoke("find_java_for_mc", { mcVersion });
-}
-
-// ── Aggregated Search (Modrinth + CurseForge) ─────────────────
-
-export interface AggregatedSearchResult {
-  source: string;
-  project_id: string;
-  slug: string;
-  title: string;
-  description: string;
-  icon_url: string;
-  downloads: number;
-  categories: string[];
-}
-
-export async function aggregatedSearch(
-  query: string,
-  offset?: number,
-  limit?: number
-): Promise<AggregatedSearchResult[]> {
-  return invoke("aggregated_search", {
-    query,
-    offset: offset ?? 0,
-    limit: limit ?? 20,
+export async function ensureJavaForMc(
+  mcVersion: string,
+  customPath?: string
+): Promise<JavaCheckResult> {
+  return invoke("ensure_java_for_mc", {
+    mcVersion,
+    customPath: customPath ?? null,
   });
 }
 
-// ── Instance Sharing ──────────────────────────────────────────
-
-export interface ShareCode {
-  code: string;
-  name: string;
-  mod_count: number;
+export async function downloadJavaVersion(javaMajor: number): Promise<string> {
+  return invoke("download_java_version", { javaMajor });
 }
 
-export async function exportInstanceShare(instanceId: string): Promise<ShareCode> {
-  return invoke("export_instance_share", { instanceId });
-}
-
-export async function importInstanceShare(code: string): Promise<InstanceListItem> {
-  return invoke("import_instance_share", { payload: { code } });
-}
