@@ -116,10 +116,12 @@ pub async fn install_mrpack(
     let mut archive = zip::ZipArchive::new(file)?;
 
     // Read index
-    let mut index_file = archive.by_name("modrinth.index.json")?;
-    let mut contents = String::new();
-    index_file.read_to_string(&mut contents)?;
-    let index: MrpackIndex = serde_json::from_str(&contents)?;
+    let index: MrpackIndex = {
+        let mut index_file = archive.by_name("modrinth.index.json")?;
+        let mut contents = String::new();
+        index_file.read_to_string(&mut contents)?;
+        serde_json::from_str(&contents)?
+    };
 
     // Create instance directories
     let mods_dir = instance_dir.join("mods");

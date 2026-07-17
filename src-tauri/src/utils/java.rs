@@ -73,7 +73,7 @@ pub fn java_version_for_mc(mc_version: &str) -> u32 {
 fn java_install_dir(java_major: u32) -> PathBuf {
     crate::utils::paths::data_dir()
         .join("java")
-        .format!("jdk-{}", java_major)
+        .join(format!("jdk-{}", java_major))
 }
 
 /// Check if a Java version is already downloaded locally.

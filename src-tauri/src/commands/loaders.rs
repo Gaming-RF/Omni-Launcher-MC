@@ -2,7 +2,7 @@ use crate::api::loaders;
 use crate::api::minecraft;
 use crate::api::modrinth;
 use crate::db;
-use crate::db::instances::InstanceListItem;
+use crate::commands::instances::InstanceListItem;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;

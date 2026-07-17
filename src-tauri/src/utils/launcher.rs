@@ -169,15 +169,22 @@ impl GameLauncher {
         }
 
         // Prepare argument replacements
+        // Bind temporaries so their borrows outlive the replacements vec
+        let game_dir = instance_dir.to_string_lossy();
+        let game_assets = self.assets_dir().join("virtual").join("legacy");
+        let game_assets_str = game_assets.to_string_lossy();
+        let assets_root_path = self.assets_dir();
+        let assets_root = assets_root_path.to_string_lossy();
+
         let replacements: Vec<(&str, &str)> = vec![
             ("${auth_player_name}", username),
             ("${auth_session}", access_token),
             ("${auth_access_token}", access_token),
             ("${auth_uuid}", uuid),
             ("${version_name}", &instance.game_version),
-            ("${game_directory}", &instance_dir.to_string_lossy()),
-            ("${game_assets}", &self.assets_dir().join("virtual").join("legacy").to_string_lossy()),
-            ("${assets_root}", &self.assets_dir().to_string_lossy()),
+            ("${game_directory}", &game_dir),
+            ("${game_assets}", &game_assets_str),
+            ("${assets_root}", &assets_root),
             ("${assets_index_name}", assets_id),
             ("${user_type}", "msa"),
             ("${user_properties}", "{}"),

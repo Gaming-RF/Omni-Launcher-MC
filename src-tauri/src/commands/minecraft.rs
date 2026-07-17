@@ -291,7 +291,7 @@ pub async fn curseforge_search(
             title: m.name,
             description: m.summary,
             icon_url: m.logo.and_then(|l| l.url).unwrap_or_default(),
-            downloads: m.download_count,
+            downloads: m.download_count.max(0) as u64,
             categories: m
                 .categories
                 .unwrap_or_default()
