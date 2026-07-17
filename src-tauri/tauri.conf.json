@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "OmniLauncherMC",
+  "version": "0.1.0",
+  "identifier": "com.omnilauncher.mca",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "OmniLauncherMC",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": true,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://api.modrinth.com https://api.curseforge.com https://piston-meta.mojang.com https://launchermeta.mojang.com https://libraries.minecraft.net https://authserver.mojang.com https://sessionserver.mojang.com https://login.microsoftonline.com https://user.auth.xboxlive.com https://xsts.auth.xboxlive.com https://api.minecraftservices.com https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://meta.quiltmc.net https://api.adoptium.net https://*.githubusercontent.com https://*.github.com; img-src 'self' https://cdn.modrinth.com https://mediafilez.forgecdn.net data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+    }
+  },
+  "plugins": {
+    "dialog": {},
+    "fs": {
+      "scope": {
+        "allow": [
+          { "path": "$APPDATA/**" },
+          { "path": "$HOME/.minecraft/**" },
+          { "path": "$DOWNLOAD/**" }
+        ]
+      }
+    },
+    "http": {
+      "scope": {
+        "allow": [
+          { "url": "https://api.modrinth.com/**" },
+          { "url": "https://api.curseforge.com/**" },
+          { "url": "https://piston-meta.mojang.com/**" },
+          { "url": "https://launchermeta.mojang.com/**" },
+          { "url": "https://libraries.minecraft.net/**" },
+          { "url": "https://authserver.mojang.com/**" },
+          { "url": "https://sessionserver.mojang.com/**" },
+          { "url": "https://login.microsoftonline.com/**" },
+          { "url": "https://user.auth.xboxlive.com/**" },
+          { "url": "https://xsts.auth.xboxlive.com/**" },
+          { "url": "https://api.minecraftservices.com/**" },
+          { "url": "https://meta.fabricmc.net/**" },
+          { "url": "https://maven.minecraftforge.net/**" },
+          { "url": "https://maven.neoforged.net/**" },
+          { "url": "https://meta.quiltmc.net/**" },
+          { "url": "https://api.adoptium.net/**" },
+          { "url": "https://*.githubusercontent.com/**" },
+          { "url": "https://*.github.com/**" }
+        ]
+      }
+    },
+    "shell": {
+      "open": true,
+      "scope": []
+    },
+    "store": {},
+    "notification": {}
+  }
+}

@@ -1,0 +1,82 @@
+# MISSING.txt — Items Not Covered in the Scaffolding
+# Last updated: 2026-07-17
+
+## 1. CurseForge API Key
+You MUST apply for a CurseForge API key at https://console.curseforge.com/
+- Register as a third-party developer
+- Explain the project (open-source Minecraft launcher)
+- They may take days/weeks to approve
+- Alternative: Start with Modrinth-only in Phase 2, add CurseForge later
+- The API key goes into Settings > API Keys in the app UI
+
+## 2. Microsoft OAuth Client ID
+You need to register an application in Azure AD (or Microsoft identity platform):
+1. Go to https://entra.microsoft.com/ > App registrations > New registration
+2. Name: "OmniLauncherMC"
+3. Redirect URI: Leave empty (Device Code flow doesn't need one)
+4. Supported account types: "Personal Microsoft accounts only"
+5. Copy the Application (client) ID
+6. Under "Authentication" > Advanced settings, enable "Allow public client flows"
+7. Add the client ID to the Rust backend auth module
+
+## 3. System Dependencies (Linux)
+Before building, install Tauri's system dependencies:
+```
+sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libssl-dev
+```
+
+## 4. Code Signing
+- **macOS**: Requires Apple Developer account ($99/year) for notarization
+- **Windows**: Code signing certificate (~$200/year) or free via SignPath for OSS
+- **Linux**: No signing required (AppImage/deb/rpm)
+
+## 5. Mojang/Minecraft EULA Compliance
+Your launcher must:
+- Download all game files through official Mojang endpoints (piston-meta.mojang.com, etc.)
+- NOT bypass authentication
+- NOT redistribute Minecraft assets or JARs
+- NOT modify the game client
+- Reference launchers: Prism Launcher (GPL), Modrinth App (GPL), ATLauncher (MIT)
+
+## 6. CurseForge Distribution Restrictions
+Some mods on CurseForge have `allowModDistribution: false`.
+The API returns `downloadUrl: null` for these mods.
+You CANNOT proxy or re-host these downloads.
+Show a "Download manually" message with a link to the CurseForge page.
+
+## 7. Missing Rust Crates (install when ready to build)
+Some crates need additional system packages:
+- `rusqlite` with "bundled" feature: includes SQLite (no system dep needed)
+- `reqwest` with TLS: needs `libssl-dev`
+- Add `zip` crate for .mrpack/.zip extraction
+- Add `flate2` for gzip handling
+
+## 8. Testing Framework
+Not yet set up. Recommended:
+- Frontend: Vitest + React Testing Library
+- Rust: cargo test (built-in)
+- E2E: Playwright (Tauri has Playwright plugin support)
+
+## 9. CI/CD Pipeline
+Create `.github/workflows/ci.yml` with:
+- Matrix build: Windows + macOS + Linux
+- Steps: checkout, setup-rust, setup-node, pnpm install, pnpm lint, cargo check, pnpm tauri build
+- Tauri provides official GitHub Action: tauri-apps/tauri-action
+
+## 10. Analytics/Crash Reporting (optional)
+Consider:
+- Sentry for crash reporting (free tier for OSS)
+- PostHog for anonymous usage analytics
+- Both are optional for an open-source launcher
+
+## 11. Modrinth OAuth App Registration
+If you want users to log into Modrinth (for modpack publishing, etc.):
+1. Register at https://modrinth.com/settings/applications
+2. Set redirect URI to your app's custom protocol (e.g., omnilauncher://auth)
+3. Not needed for MVP (anonymous API access works for browsing)
+
+## 12. Auto-Update Signing Key
+Tauri's built-in updater requires a signing keypair:
+1. Generate: `pnpm tauri signer generate -w ~/.tauri/omni.key`
+2. Set the public key in `tauri.conf.json` under `plugins.updater`
+3. Store the private key as a GitHub secret for CI builds

@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Custom theme for the launcher */
+:root {
+  --color-omni-green: #4ade80;
+  --color-omni-green-dark: #22c55e;
+  --color-omni-blue: #3b82f6;
+  --color-omni-purple: #a855f7;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Ensure the app fills the viewport */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}

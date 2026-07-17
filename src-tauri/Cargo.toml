@@ -1,0 +1,38 @@
+[package]
+name = "omni-launcher-mc"
+version = "0.1.0"
+description = "Open-source Minecraft launcher unifying Modrinth, CurseForge, and custom modpacks"
+authors = ["OmniLauncherMC Contributors"]
+edition = "2021"
+
+[lib]
+name = "omni_launcher_mclib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1", features = ["full"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+sha1 = "0.10"
+sha2 = "0.10"
+hex = "0.4"
+dirs = "6"
+anyhow = "1"
+thiserror = "2"
+log = "0.4"
+env_logger = "0.11"
