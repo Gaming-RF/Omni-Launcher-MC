@@ -324,11 +324,25 @@ pub fn import_instance_share(
     // Validate the share data
     crate::utils::validate::validate_instance_name(&share.name)?;
 
+    let suffix = " (imported)";
+    let max_base = 64usize.saturating_sub(suffix.len());
+    // Truncate at a char boundary to avoid panicking on multi-byte UTF-8
+    let base_name = if share.name.len() > max_base {
+        let mut end = max_base;
+        while end > 0 && !share.name.is_char_boundary(end) {
+            end -= 1;
+        }
+        &share.name[..end]
+    } else {
+        &share.name
+    };
+    let truncated_name = format!("{}{}", base_name, suffix);
+
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let instance = db::instances::create_instance(
         &db,
         db::instances::CreateInstanceParams {
-            name: format!("{} (imported)", share.name),
+            name: truncated_name,
             game_version: share.game_version,
             loader: share.loader,
             loader_version: share.loader_version,
