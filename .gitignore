@@ -1,9 +1,55 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build output
 dist/
 src-tauri/target/
-*.log
-.DS_Store
+src-tauri/gen/
+
+# Environment / secrets — NEVER commit these
 .env
 .env.local
+.env.*.local
+*.pem
+*.p12
+*.key
+*.secret
+
+# Databases (local runtime data)
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+cargo.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Tauri signing keys (generated locally, must stay private)
+src-tauri/*.key
+src-tauri/*.key.pub
+
+# Rust
+**/*.rs.bk
+Cargo.lock
+
+# Coverage
+coverage/
+*.lcov
