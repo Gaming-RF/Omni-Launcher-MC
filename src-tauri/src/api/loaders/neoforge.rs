@@ -13,7 +13,7 @@ const MAVEN_BASE: &str = "https://maven.neoforged.net/releases";
 const USER_AGENT: &str = "OmniLauncherMC/0.1.0";
 
 /// Get the download URL for a NeoForge installer JAR.
-fn installer_url(mc_version: &str, neoforge_version: &str) -> String {
+fn installer_url(_mc_version: &str, neoforge_version: &str) -> String {
     format!(
         "{}/net/neoforged/neoforge/{}/neoforge-{}-installer.jar",
         MAVEN_BASE, neoforge_version, neoforge_version

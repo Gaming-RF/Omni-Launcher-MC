@@ -8,11 +8,10 @@
 
 use serde::Serialize;
 use std::collections::HashMap;
-use std::process::ExitStatus;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::Child;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct GameLogEvent {

@@ -4,10 +4,22 @@ version = "0.1.0"
 description = "Open-source Minecraft launcher unifying Modrinth, CurseForge, and custom modpacks"
 authors = ["OmniLauncherMC Contributors"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/Gaming-RF/Omni-Launcher-MC"
+keywords = ["minecraft", "launcher", "modrinth", "curseforge", "modpack"]
+categories = ["games"]
+rust-version = "1.70"
 
 [lib]
 name = "omni_launcher_mclib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

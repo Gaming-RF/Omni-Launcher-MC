@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 const ADOPTIUM_API: &str = "https://api.adoptium.net/v3";
 const USER_AGENT: &str = "OmniLauncherMC/0.1.0";
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct AdoptiumAsset {
     binary: AdoptiumBinary,
@@ -26,6 +27,7 @@ struct AdoptiumAsset {
     version: AdoptiumVersion,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct AdoptiumBinary {
     package: AdoptiumPackage,
@@ -33,6 +35,7 @@ struct AdoptiumBinary {
     architecture: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct AdoptiumPackage {
     link: String,
@@ -40,6 +43,7 @@ struct AdoptiumPackage {
     size: u64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct AdoptiumVersion {
     major: u32,
@@ -271,7 +275,6 @@ fn check_java_version_sufficient(version_output: &str, required_major: u32) -> b
 
 /// Extract a .tar.gz archive to a destination directory.
 fn extract_tar_gz(archive_path: &Path, dest: &Path) -> Result<()> {
-    use std::io::Read;
     use std::process::Command;
 
     // Use system tar for extraction (available on all platforms we support)

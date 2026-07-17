@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::process::Command;
 
 use crate::api::minecraft;
@@ -84,7 +84,7 @@ impl GameLauncher {
         let index_json = std::fs::read_to_string(&asset_index_path)?;
         let asset_index: minecraft::AssetIndexData = serde_json::from_str(&index_json)?;
 
-        for (name, obj) in &asset_index.objects {
+        for (_name, obj) in &asset_index.objects {
             let hash_prefix = &obj.hash[..2];
             let asset_path = self
                 .assets_dir()

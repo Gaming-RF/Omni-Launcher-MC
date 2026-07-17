@@ -224,8 +224,10 @@ pub async fn install_mrpack(
 pub struct CfManifest {
     #[serde(rename = "minecraft")]
     pub minecraft: CfMinecraft,
-    pub manifestType: String,
-    pub manifestVersion: u32,
+    #[serde(rename = "manifestType")]
+    pub manifest_type: String,
+    #[serde(rename = "manifestVersion")]
+    pub manifest_version: u32,
     pub name: String,
     pub version: String,
     pub author: String,

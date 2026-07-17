@@ -8,8 +8,6 @@ use crate::AppState;
 use serde::Serialize;
 use tauri::State;
 
-use super::instances::InstanceListItem;
-
 #[derive(Serialize)]
 pub struct VersionEntry {
     pub id: String,
@@ -230,6 +228,10 @@ pub async fn modrinth_search(
     offset: Option<u32>,
     limit: Option<u32>,
 ) -> Result<Vec<ModSearchResult>, String> {
+    let query = crate::utils::validate::sanitize_query(&query);
+    if query.is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
     let results = modrinth::search(
         &query,
         None,
@@ -264,6 +266,11 @@ pub async fn curseforge_search(
     offset: Option<i32>,
     limit: Option<i32>,
 ) -> Result<Vec<ModSearchResult>, String> {
+    let query = crate::utils::validate::sanitize_query(&query);
+    if query.is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
+
     let api_key = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         db::settings::get_curseforge_api_key(&db)
@@ -328,9 +335,8 @@ pub async fn launch_game_offline(
     instance_id: String,
     username: String,
 ) -> Result<u32, String> {
-    if username.trim().is_empty() {
-        return Err("Username cannot be empty".to_string());
-    }
+    crate::utils::validate::validate_id(&instance_id)?;
+    crate::utils::validate::validate_username(&username)?;
 
     let task_id = format!("launch-{}", instance_id);
 
