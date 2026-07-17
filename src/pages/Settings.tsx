@@ -27,7 +27,7 @@ export default function Settings() {
       // Poll for completion
       const poll = async () => {
         try {
-          const account = await loginPoll(response.device_code);
+          await loginPoll(response.device_code);
           auth.fetchAccounts();
           setDeviceCode(null);
           setUserCode(null);
