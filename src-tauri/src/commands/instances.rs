@@ -242,3 +242,113 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result
     }
     Ok(())
 }
+
+// ── Instance Share ──────────────────────────────────────────────
+
+use base64::{engine::general_purpose::STANDARD as B64, Engine};
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SharePayload {
+    name: String,
+    game_version: String,
+    loader: String,
+    loader_version: Option<String>,
+    icon: Option<String>,
+    java_args: Option<String>,
+    allocated_memory_mb: i64,
+}
+
+#[derive(Serialize)]
+pub struct ShareCode {
+    pub code: String,
+    pub name: String,
+    pub mod_count: usize,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ImportPayload {
+    pub code: String,
+}
+
+/// Export an instance configuration as a shareable base64 code.
+#[tauri::command]
+pub fn export_instance_share(
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<ShareCode, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let instance = db::instances::get_instance(&db, &instance_id)
+        .map_err(|e| e.to_string())?
+        .ok_or("Instance not found")?;
+
+    let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+
+    let share = SharePayload {
+        name: instance.name.clone(),
+        game_version: instance.game_version,
+        loader: instance.loader,
+        loader_version: instance.loader_version,
+        icon: instance.icon,
+        java_args: instance.java_args,
+        allocated_memory_mb: instance.allocated_memory_mb,
+    };
+
+    let json = serde_json::to_string(&share).map_err(|e| e.to_string())?;
+    let code = format!("OMC:{}", B64.encode(json.as_bytes()));
+
+    Ok(ShareCode {
+        code,
+        name: instance.name,
+        mod_count: mods.len(),
+    })
+}
+
+/// Import an instance from a share code. Creates a new instance.
+#[tauri::command]
+pub fn import_instance_share(
+    state: State<'_, AppState>,
+    payload: ImportPayload,
+) -> Result<InstanceListItem, String> {
+    let code = payload
+        .code
+        .strip_prefix("OMC:")
+        .ok_or("Invalid share code: must start with OMC:")?;
+
+    let bytes = B64
+        .decode(code)
+        .map_err(|e| format!("Invalid share code: {}", e))?;
+    let json = String::from_utf8(bytes).map_err(|e| format!("Invalid share code: {}", e))?;
+    let share: SharePayload =
+        serde_json::from_str(&json).map_err(|e| format!("Invalid share code: {}", e))?;
+
+    // Validate the share data
+    crate::utils::validate::validate_instance_name(&share.name)?;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let instance = db::instances::create_instance(
+        &db,
+        db::instances::CreateInstanceParams {
+            name: format!("{} (imported)", share.name),
+            game_version: share.game_version,
+            loader: share.loader,
+            loader_version: share.loader_version,
+            icon: share.icon,
+            java_args: share.java_args,
+            allocated_memory_mb: share.allocated_memory_mb,
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(InstanceListItem {
+        id: instance.id,
+        name: instance.name,
+        game_version: instance.game_version,
+        loader: instance.loader,
+        loader_version: instance.loader_version,
+        icon: instance.icon,
+        created_at: instance.created_at,
+        last_played: instance.last_played,
+        play_time_secs: instance.play_time_secs,
+        allocated_memory_mb: instance.allocated_memory_mb,
+    })
+}

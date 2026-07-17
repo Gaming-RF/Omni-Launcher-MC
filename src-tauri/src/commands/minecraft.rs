@@ -433,3 +433,95 @@ pub async fn launch_game_offline(
 
     Ok(pid)
 }
+
+// ── Aggregated Search ──────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct AggregatedSearchResult {
+    pub source: String,
+    pub project_id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: String,
+    pub downloads: u64,
+    pub categories: Vec<String>,
+}
+
+/// Search both Modrinth and CurseForge simultaneously, merge results.
+#[tauri::command]
+pub async fn aggregated_search(
+    state: State<'_, AppState>,
+    query: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+) -> Result<Vec<AggregatedSearchResult>, String> {
+    let query = crate::utils::validate::sanitize_query(&query);
+    if query.is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
+
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(20);
+
+    // Run both searches in parallel
+    let modrinth_fut = modrinth::search(&query, None, offset, limit);
+    let curseforge_fut = async {
+        let api_key = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            db::settings::get_curseforge_api_key(&db).map_err(|e| e.to_string())?
+        };
+        match api_key {
+            Some(key) => {
+                curseforge::search_mods(&key, &query, None, None, offset as i32, limit as i32)
+                    .await
+                    .map(|r| r.data)
+                    .map_err(|e| e.to_string())
+            }
+            None => Ok(vec![]), // No API key = skip CurseForge
+        }
+    };
+
+    let (modrinth_result, curseforge_result) = tokio::join!(modrinth_fut, curseforge_fut);
+
+    let mut results: Vec<AggregatedSearchResult> = Vec::new();
+
+    // Add Modrinth results
+    if let Ok(mr) = modrinth_result {
+        for h in mr.hits {
+            results.push(AggregatedSearchResult {
+                source: "modrinth".to_string(),
+                project_id: h.project_id,
+                slug: h.slug,
+                title: h.title,
+                description: h.description,
+                icon_url: h.icon_url,
+                downloads: h.downloads,
+                categories: h.display_categories.unwrap_or_default(),
+            });
+        }
+    }
+
+    // Add CurseForge results
+    if let Ok(cf) = curseforge_result {
+        for m in cf {
+            results.push(AggregatedSearchResult {
+                source: "curseforge".to_string(),
+                project_id: m.id.to_string(),
+                slug: m.slug,
+                title: m.name,
+                description: m.summary,
+                icon_url: m.logo.and_then(|l| l.url).unwrap_or_default(),
+                downloads: m.download_count.max(0) as u64,
+                categories: m
+                    .categories
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| c.name)
+                    .collect(),
+            });
+        }
+    }
+
+    Ok(results)
+}

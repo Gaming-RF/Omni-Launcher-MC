@@ -119,6 +119,11 @@ pub fn run() {
             commands::process::get_game_logs,
             // Instance management commands
             commands::instances::duplicate_instance,
+            // Share commands
+            commands::instances::export_instance_share,
+            commands::instances::import_instance_share,
+            // Aggregated search
+            commands::minecraft::aggregated_search,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");
