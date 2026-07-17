@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
 import { Home } from "./pages/Home";
-import Discover from "./pages/Discover";
+import { Discover } from "./pages/Discover";
 import { Settings } from "./pages/Settings";
 import { useAppInit } from "./hooks/useAppInit";
 

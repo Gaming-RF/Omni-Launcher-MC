@@ -11,9 +11,9 @@
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use sha1::Digest as Sha1Digest;
-use sha2::Digest as Sha256Digest;
-use sha2::Sha512 as Sha512Hasher;
+use sha1::Digest as _;
+
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;

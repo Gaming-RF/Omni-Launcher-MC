@@ -1,82 +1,64 @@
-# MISSING.txt — Items Not Covered in the Scaffolding
-# Last updated: 2026-07-17
+# MISSING / Supplementary Items
 
-## 1. CurseForge API Key
-You MUST apply for a CurseForge API key at https://console.curseforge.com/
-- Register as a third-party developer
-- Explain the project (open-source Minecraft launcher)
-- They may take days/weeks to approve
-- Alternative: Start with Modrinth-only in Phase 2, add CurseForge later
-- The API key goes into Settings > API Keys in the app UI
+## ✅ Resolved
+- [x] Modrinth API client (implemented)
+- [x] CurseForge API client (implemented)
+- [x] Microsoft OAuth Device Code flow (implemented)
+- [x] Xbox/XSTS/Minecraft auth chain (implemented)
+- [x] Game launch orchestration (implemented)
+- [x] SQLite database schema & CRUD (implemented)
+- [x] Version manifest + asset downloader (implemented)
 
-## 2. Microsoft OAuth Client ID
-You need to register an application in Azure AD (or Microsoft identity platform):
-1. Go to https://entra.microsoft.com/ > App registrations > New registration
-2. Name: "OmniLauncherMC"
-3. Redirect URI: Leave empty (Device Code flow doesn't need one)
-4. Supported account types: "Personal Microsoft accounts only"
-5. Copy the Application (client) ID
-6. Under "Authentication" > Advanced settings, enable "Allow public client flows"
-7. Add the client ID to the Rust backend auth module
+## 🔴 Required Before First Use
 
-## 3. System Dependencies (Linux)
-Before building, install Tauri's system dependencies:
+### 1. CurseForge API Key
+The CurseForge browsing feature requires an API key.  
+Get one free at: https://console.curseforge.com/  
+Add it in Settings > CurseForge API Key.
+
+### 2. Microsoft Azure AD Client ID
+`src-tauri/src/api/auth.rs` has `CLIENT_ID = "YOUR_CLIENT_ID_HERE"`.  
+To enable Microsoft login you must register an Azure AD app:
+1. Go to https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
+2. Register a new app (Mobile and desktop application)
+3. Set redirect URI to `http://localhost` (not needed for device code flow)
+4. Copy the Application (client) ID into `auth.rs`
+
+## 🟡 System Requirements
+
+### 3. Linux Build Dependencies
+On Ubuntu/Debian, install before building:
 ```
-sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libssl-dev
+sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev libssl-dev
 ```
+Fedora: `webkit2gtk4.1-devel libsoup3-devel javascriptcoregtk4.1-devel openssl-devel`
+Arch: `webkit2gtk-4.1 libsoup3 javascriptcoregtk-4.1 openssl`
 
-## 4. Code Signing
-- **macOS**: Requires Apple Developer account ($99/year) for notarization
-- **Windows**: Code signing certificate (~$200/year) or free via SignPath for OSS
-- **Linux**: No signing required (AppImage/deb/rpm)
+### 4. Java 21+ (at Runtime)
+Minecraft 1.20.5+ requires Java 21. The launcher auto-detects Java from:
+- `JAVA_HOME` environment variable
+- Common install paths (platform-specific)
+- System `PATH`
 
-## 5. Mojang/Minecraft EULA Compliance
-Your launcher must:
-- Download all game files through official Mojang endpoints (piston-meta.mojang.com, etc.)
-- NOT bypass authentication
-- NOT redistribute Minecraft assets or JARs
-- NOT modify the game client
-- Reference launchers: Prism Launcher (GPL), Modrinth App (GPL), ATLauncher (MIT)
+You can also set a custom path in Settings > Java.
 
-## 6. CurseForge Distribution Restrictions
-Some mods on CurseForge have `allowModDistribution: false`.
-The API returns `downloadUrl: null` for these mods.
-You CANNOT proxy or re-host these downloads.
-Show a "Download manually" message with a link to the CurseForge page.
+## 🟢 Nice-to-Have (Not Blocking)
 
-## 7. Missing Rust Crates (install when ready to build)
-Some crates need additional system packages:
-- `rusqlite` with "bundled" feature: includes SQLite (no system dep needed)
-- `reqwest` with TLS: needs `libssl-dev`
-- Add `zip` crate for .mrpack/.zip extraction
-- Add `flate2` for gzip handling
+### 5. Code Signing (macOS/Windows)
+For distributing signed builds:
+- macOS: Apple Developer certificate + notarization
+- Windows: Authenticode certificate
 
-## 8. Testing Framework
-Not yet set up. Recommended:
-- Frontend: Vitest + React Testing Library
-- Rust: cargo test (built-in)
-- E2E: Playwright (Tauri has Playwright plugin support)
+### 6. EULA Compliance
+By using this launcher, users agree to the Minecraft EULA:
+https://www.minecraft.net/en-us/eula
+The launcher does not bypass authentication or distribute Mojang assets.
 
-## 9. CI/CD Pipeline
-Create `.github/workflows/ci.yml` with:
-- Matrix build: Windows + macOS + Linux
-- Steps: checkout, setup-rust, setup-node, pnpm install, pnpm lint, cargo check, pnpm tauri build
-- Tauri provides official GitHub Action: tauri-apps/tauri-action
+### 7. Auto-Updater
+Tauri supports built-in auto-updates via `tauri-plugin-updater`. Not yet configured.
+Requires a hosted update manifest (JSON) + signed update bundles.
 
-## 10. Analytics/Crash Reporting (optional)
-Consider:
-- Sentry for crash reporting (free tier for OSS)
-- PostHog for anonymous usage analytics
-- Both are optional for an open-source launcher
-
-## 11. Modrinth OAuth App Registration
-If you want users to log into Modrinth (for modpack publishing, etc.):
-1. Register at https://modrinth.com/settings/applications
-2. Set redirect URI to your app's custom protocol (e.g., omnilauncher://auth)
-3. Not needed for MVP (anonymous API access works for browsing)
-
-## 12. Auto-Update Signing Key
-Tauri's built-in updater requires a signing keypair:
-1. Generate: `pnpm tauri signer generate -w ~/.tauri/omni.key`
-2. Set the public key in `tauri.conf.json` under `plugins.updater`
-3. Store the private key as a GitHub secret for CI builds
+### 8. Crash/Error Reporting
+No telemetry or crash reporting is implemented. Consider Sentry, Bugsnag, or a custom
+reporting endpoint for production.
