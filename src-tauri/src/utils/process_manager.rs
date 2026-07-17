@@ -13,6 +13,18 @@ use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 
+/// Recover from a poisoned mutex by extracting the inner data.
+/// A poisoned mutex means a thread panicked while holding the lock,
+/// but the data is still accessible — we log and continue.
+macro_rules! lock_or_recover {
+    ($mutex:expr) => {
+        $mutex.lock().unwrap_or_else(|e| {
+            log::warn!("Mutex poisoned, recovering: {}", e);
+            e.into_inner()
+        })
+    };
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct GameLogEvent {
     pub instance_id: String,
@@ -79,13 +91,13 @@ impl ProcessManager {
 
         // Store the child
         {
-            let mut procs = self.processes.lock().unwrap();
+            let mut procs = lock_or_recover!(self.processes);
             procs.insert(iid.clone(), child);
         }
 
         // Init log buffer
         {
-            let mut logs = self.logs.lock().unwrap();
+            let mut logs = lock_or_recover!(self.logs);
             logs.insert(iid.clone(), Vec::new());
         }
 
@@ -107,9 +119,8 @@ impl ProcessManager {
                 let reader = BufReader::new(stdout);
                 let mut lines = reader.lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    // Store in ring buffer
                     {
-                        let mut logs = logs_stdout.lock().unwrap();
+                        let mut logs = lock_or_recover!(logs_stdout);
                         if let Some(buf) = logs.get_mut(&iid_stdout) {
                             buf.push(line.clone());
                             if buf.len() > MAX_LOG_LINES {
@@ -139,7 +150,7 @@ impl ProcessManager {
                 let mut lines = reader.lines();
                 while let Ok(Some(line)) = lines.next_line().await {
                     {
-                        let mut logs = logs_stderr.lock().unwrap();
+                        let mut logs = lock_or_recover!(logs_stderr);
                         if let Some(buf) = logs.get_mut(&iid_stderr) {
                             buf.push(line.clone());
                             if buf.len() > MAX_LOG_LINES {
@@ -164,11 +175,9 @@ impl ProcessManager {
         let iid_exit = iid.clone();
         let procs_exit = self.processes.clone();
         tokio::spawn(async move {
-            // We need to wait on the child, but we already stored it.
-            // Poll the process map periodically.
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                let mut procs = procs_exit.lock().unwrap();
+                let mut procs = lock_or_recover!(procs_exit);
                 if let Some(child) = procs.get_mut(&iid_exit) {
                     match child.try_wait() {
                         Ok(Some(status)) => {
@@ -196,7 +205,6 @@ impl ProcessManager {
                         }
                     }
                 } else {
-                    // Process was removed (killed externally)
                     break;
                 }
             }
@@ -205,19 +213,19 @@ impl ProcessManager {
 
     /// Check if an instance is currently running.
     pub fn is_running(&self, instance_id: &str) -> bool {
-        let procs = self.processes.lock().unwrap();
+        let procs = lock_or_recover!(self.processes);
         procs.contains_key(instance_id)
     }
 
     /// Get list of running instances.
     pub fn running_instances(&self) -> Vec<String> {
-        let procs = self.processes.lock().unwrap();
+        let procs = lock_or_recover!(self.processes);
         procs.keys().cloned().collect()
     }
 
     /// Kill a running instance.
     pub fn kill(&self, instance_id: &str) -> Result<(), String> {
-        let mut procs = self.processes.lock().unwrap();
+        let mut procs = lock_or_recover!(self.processes);
         if let Some(mut child) = procs.remove(instance_id) {
             child.start_kill().map_err(|e| e.to_string())?;
             Ok(())
@@ -228,7 +236,7 @@ impl ProcessManager {
 
     /// Get stored log lines for an instance.
     pub fn get_logs(&self, instance_id: &str) -> Vec<String> {
-        let logs = self.logs.lock().unwrap();
+        let logs = lock_or_recover!(self.logs);
         logs.get(instance_id).cloned().unwrap_or_default()
     }
 }

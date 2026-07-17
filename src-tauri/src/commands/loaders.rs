@@ -89,7 +89,7 @@ pub async fn install_fabric_loader(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
-            .unwrap();
+            .ok_or("Instance not found")?;
         inst.loader = "fabric".to_string();
         inst.loader_version = Some(loader_version);
         // Update game_version to the profile ID so the launcher uses the Fabric JSON
@@ -121,7 +121,7 @@ pub async fn install_quilt_loader(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
-            .unwrap();
+            .ok_or("Instance not found")?;
         inst.loader = "quilt".to_string();
         inst.loader_version = Some(loader_version);
         db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
@@ -152,7 +152,7 @@ pub async fn install_forge_loader(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
-            .unwrap();
+            .ok_or("Instance not found")?;
         inst.loader = "forge".to_string();
         inst.loader_version = Some(forge_version);
         db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
@@ -184,7 +184,7 @@ pub async fn install_neoforge_loader(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
-            .unwrap();
+            .ok_or("Instance not found")?;
         inst.loader = "neoforge".to_string();
         inst.loader_version = Some(neoforge_version);
         db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
