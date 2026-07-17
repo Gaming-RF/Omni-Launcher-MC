@@ -9,6 +9,8 @@ use crate::AppState;
 use serde::Serialize;
 use tauri::State;
 
+use super::instances::InstanceListItem;
+
 #[derive(Serialize)]
 pub struct VersionEntry {
     pub id: String,
@@ -301,7 +303,7 @@ pub async fn export_instance_share(
             .map_err(|e| e.to_string())?
             .ok_or("Instance not found")?;
 
-        let mods = db::instances::get_instance_mods(&db, &instance_id)
+        let mods = db::mods::get_instance_mods(&db, &instance_id)
             .map_err(|e| e.to_string())?;
 
         (instance, mods)

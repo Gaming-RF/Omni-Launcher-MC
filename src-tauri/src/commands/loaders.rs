@@ -332,3 +332,52 @@ pub fn remove_mod(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db::mods::remove_mod(&db, mod_id, &mods_dir).map_err(|e| e.to_string())
 }
+
+// ── Modpack Import ─────────────────────────────────────────────
+
+use crate::utils::modpack;
+
+#[derive(Serialize)]
+pub struct ModpackInfoResult {
+    pub name: String,
+    pub version: String,
+    pub summary: Option<String>,
+    pub game_version: String,
+    pub loader: String,
+    pub loader_version: String,
+    pub file_count: usize,
+}
+
+/// Parse a .mrpack file and return its metadata.
+#[tauri::command]
+pub fn parse_mrpack_file(file_path: String) -> Result<ModpackInfoResult, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    let info = modpack::parse_mrpack(&path).map_err(|e| e.to_string())?;
+
+    Ok(ModpackInfoResult {
+        name: info.name,
+        version: info.version,
+        summary: info.summary,
+        game_version: info.game_version,
+        loader: info.loader,
+        loader_version: info.loader_version,
+        file_count: info.file_count,
+    })
+}
+
+/// Parse a CurseForge modpack ZIP and return its metadata.
+#[tauri::command]
+pub fn parse_cf_modpack_file(file_path: String) -> Result<ModpackInfoResult, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    let info = modpack::parse_cf_modpack(&path).map_err(|e| e.to_string())?;
+
+    Ok(ModpackInfoResult {
+        name: info.name,
+        version: info.version,
+        summary: info.summary,
+        game_version: info.game_version,
+        loader: info.loader,
+        loader_version: info.loader_version,
+        file_count: info.file_count,
+    })
+}

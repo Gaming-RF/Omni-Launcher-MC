@@ -24,7 +24,6 @@ interface ActiveDownload {
   bytesDownloaded: number;
   totalBytes: number;
   status: DownloadStatus;
-  percent: number;
 }
 
 export default function DownloadPanel() {
@@ -35,29 +34,20 @@ export default function DownloadPanel() {
 
   const handleEvent = useCallback((event: { payload: DownloadProgressEvent }) => {
     const p = event.payload;
-
     setVisible(true);
     setTotal(p.total);
 
     setActive((prev) => {
       const next = new Map(prev);
-      const percent =
-        p.total_bytes > 0
-          ? Math.round((p.bytes_downloaded / p.total_bytes) * 100)
-          : 0;
-
       next.set(p.index, {
         name: p.display_name || `File ${p.index + 1}`,
         bytesDownloaded: p.bytes_downloaded,
         totalBytes: p.total_bytes,
         status: p.status,
-        percent,
       });
-
       return next;
     });
 
-    // Count completed/skipped/failed
     if (
       typeof p.status === "string" &&
       (p.status === "Completed" || p.status === "Skipped")
@@ -70,16 +60,10 @@ export default function DownloadPanel() {
   }, []);
 
   useEffect(() => {
-    const unlisten = listen<DownloadProgressEvent>(
-      "download-progress",
-      handleEvent
-    );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
+    const unlisten = listen<DownloadProgressEvent>("download-progress", handleEvent);
+    return () => { unlisten.then((fn) => fn()); };
   }, [handleEvent]);
 
-  // Auto-hide after all downloads complete
   useEffect(() => {
     if (total > 0 && completed >= total) {
       const timer = setTimeout(() => {
@@ -95,12 +79,10 @@ export default function DownloadPanel() {
   if (!visible || active.size === 0) return null;
 
   const downloads = Array.from(active.entries()).sort(([a], [b]) => a - b);
-  const overallPercent =
-    total > 0 ? Math.round((completed / total) * 100) : 0;
+  const overallPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-96 rounded-xl border border-zinc-700 bg-zinc-900/95 p-4 shadow-2xl backdrop-blur">
-      {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Download className="h-4 w-4 text-green-400" />
@@ -108,26 +90,19 @@ export default function DownloadPanel() {
             Downloads ({completed}/{total})
           </span>
         </div>
-        <button
-          onClick={() => setVisible(false)}
-          className="rounded p-1 text-zinc-500 hover:text-zinc-300"
-        >
+        <button onClick={() => setVisible(false)} className="rounded p-1 text-zinc-500 hover:text-zinc-300">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Overall progress */}
       <ProgressBar value={overallPercent} size="sm" label="Overall" />
 
-      {/* Individual files */}
       <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
         {downloads.map(([idx, dl]) => (
           <div key={idx} className="flex items-center gap-2 text-xs">
             <StatusIcon status={dl.status} />
             <span className="flex-1 truncate text-zinc-300">{dl.name}</span>
-            <span className="w-12 text-right text-zinc-500">
-              {formatStatus(dl)}
-            </span>
+            <span className="w-12 text-right text-zinc-500">{formatStatus(dl)}</span>
           </div>
         ))}
       </div>
@@ -138,14 +113,10 @@ export default function DownloadPanel() {
 function StatusIcon({ status }: { status: DownloadStatus }) {
   if (typeof status === "string") {
     switch (status) {
-      case "Downloading":
-        return <Download className="h-3 w-3 animate-pulse text-blue-400" />;
-      case "Verifying":
-        return <Download className="h-3 w-3 animate-spin text-yellow-400" />;
-      case "Completed":
-        return <CheckCircle2 className="h-3 w-3 text-green-400" />;
-      case "Skipped":
-        return <SkipForward className="h-3 w-3 text-zinc-500" />;
+      case "Downloading": return <Download className="h-3 w-3 animate-pulse text-blue-400" />;
+      case "Verifying": return <Download className="h-3 w-3 animate-spin text-yellow-400" />;
+      case "Completed": return <CheckCircle2 className="h-3 w-3 text-green-400" />;
+      case "Skipped": return <SkipForward className="h-3 w-3 text-zinc-500" />;
     }
   }
   return <AlertCircle className="h-3 w-3 text-red-400" />;
@@ -153,25 +124,15 @@ function StatusIcon({ status }: { status: DownloadStatus }) {
 
 function formatStatus(dl: ActiveDownload): string {
   const { status, bytesDownloaded, totalBytes } = dl;
-
-  if (typeof status === "object" && "Failed" in status) {
-    return "Failed";
-  }
-
+  if (typeof status === "object" && "Failed" in status) return "Failed";
   switch (status) {
     case "Downloading":
-      if (totalBytes > 0) {
-        return `${formatBytes(bytesDownloaded)}/${formatBytes(totalBytes)}`;
-      }
-      return `${formatBytes(bytesDownloaded)}`;
-    case "Verifying":
-      return "Verifying";
-    case "Completed":
+      if (totalBytes > 0) return `${formatBytes(bytesDownloaded)}/${formatBytes(totalBytes)}`;
       return formatBytes(bytesDownloaded);
-    case "Skipped":
-      return "Skipped";
-    default:
-      return "";
+    case "Verifying": return "Verifying";
+    case "Completed": return formatBytes(bytesDownloaded);
+    case "Skipped": return "Skipped";
+    default: return "";
   }
 }
 

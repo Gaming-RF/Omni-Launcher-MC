@@ -93,18 +93,9 @@ fn main() {
             commands::loaders::install_mod_from_modrinth,
             commands::loaders::toggle_mod_enabled,
             commands::loaders::remove_mod,
-            // Java management commands
-            commands::java::detect_java_installations,
-            commands::java::auto_download_java,
-            commands::java::find_java_for_mc,
-            commands::java::fetch_loader_versions,
-            commands::java::install_mod_loader,
-            commands::java::parse_mrpack_file,
-            commands::java::parse_cf_modpack_file,
-            // Aggregated search + sharing
-            commands::minecraft::aggregated_search,
-            commands::minecraft::export_instance_share,
-            commands::minecraft::import_instance_share,
+            // Modpack import commands
+            commands::loaders::parse_mrpack_file,
+            commands::loaders::parse_cf_modpack_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");
