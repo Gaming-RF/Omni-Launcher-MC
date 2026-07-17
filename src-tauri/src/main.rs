@@ -96,6 +96,7 @@ fn main() {
             // Modpack import commands
             commands::loaders::parse_mrpack_file,
             commands::loaders::parse_cf_modpack_file,
+            commands::loaders::install_mrpack_modpack,
             // Java management commands
             commands::java::get_required_java_version,
             commands::java::ensure_java_for_mc,

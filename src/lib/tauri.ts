@@ -292,6 +292,13 @@ export async function parseCfModpackFile(filePath: string): Promise<ModpackInfo>
   return invoke("parse_cf_modpack_file", { filePath });
 }
 
+export async function installMrpackModpack(
+  filePath: string,
+  instanceName: string
+): Promise<InstanceListItem> {
+  return invoke("install_mrpack_modpack", { filePath, instanceName });
+}
+
 // ── Java Management ───────────────────────────────────────────
 
 export interface JavaCheckResult {

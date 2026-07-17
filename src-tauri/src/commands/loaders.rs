@@ -2,6 +2,7 @@ use crate::api::loaders;
 use crate::api::minecraft;
 use crate::api::modrinth;
 use crate::db;
+use crate::db::instances::InstanceListItem;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -379,5 +380,80 @@ pub fn parse_cf_modpack_file(file_path: String) -> Result<ModpackInfoResult, Str
         loader: info.loader,
         loader_version: info.loader_version,
         file_count: info.file_count,
+    })
+}
+
+/// Install a modpack from a .mrpack file: parse, create instance, download files.
+#[tauri::command]
+pub async fn install_mrpack_modpack(
+    state: State<'_, AppState>,
+    file_path: String,
+    instance_name: String,
+) -> Result<InstanceListItem, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    let info = modpack::parse_mrpack(&path).map_err(|e| e.to_string())?;
+
+    // Create instance in database
+    let instance = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::instances::create_instance(
+            &db,
+            db::instances::CreateInstanceParams {
+                name: instance_name,
+                game_version: info.game_version.clone(),
+                loader: info.loader.clone(),
+                loader_version: Some(info.loader_version.clone()),
+                icon: None,
+                java_args: None,
+                allocated_memory_mb: 4096,
+            },
+        )
+        .map_err(|e| e.to_string())?
+    };
+
+    // Create instance directory and install modpack files
+    let instance_dir = crate::utils::paths::instances_dir().join(&instance.id);
+    modpack::install_mrpack(&path, &instance_dir)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Install the mod loader if needed
+    let base_dir = crate::utils::paths::data_dir();
+    if info.loader != "vanilla" && !info.loader_version.is_empty() {
+        let result = match info.loader.as_str() {
+            "fabric" => {
+                loaders::fabric::install(&base_dir, &info.game_version, &info.loader_version)
+                    .await
+            }
+            "quilt" => {
+                loaders::quilt::install(&base_dir, &info.game_version, &info.loader_version)
+                    .await
+            }
+            "forge" => {
+                loaders::forge::install(&base_dir, &info.game_version, &info.loader_version)
+                    .await
+            }
+            "neoforge" => {
+                loaders::neoforge::install(&base_dir, &info.game_version, &info.loader_version)
+                    .await
+            }
+            _ => Ok(String::new()),
+        };
+        if let Err(e) = result {
+            log::warn!("Loader install warning: {}", e);
+        }
+    }
+
+    Ok(InstanceListItem {
+        id: instance.id,
+        name: instance.name,
+        game_version: instance.game_version,
+        loader: instance.loader,
+        loader_version: instance.loader_version,
+        icon: instance.icon,
+        created_at: instance.created_at,
+        last_played: instance.last_played,
+        play_time_secs: instance.play_time_secs,
+        allocated_memory_mb: instance.allocated_memory_mb,
     })
 }
