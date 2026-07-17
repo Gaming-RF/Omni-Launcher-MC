@@ -111,6 +111,7 @@ pub fn parse_mrpack(path: &Path) -> Result<ModpackInfo> {
 pub async fn install_mrpack(
     path: &Path,
     instance_dir: &Path,
+    http_client: &reqwest::Client,
 ) -> Result<ModpackInfo> {
     let file = std::fs::File::open(path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -128,8 +129,6 @@ pub async fn install_mrpack(
     std::fs::create_dir_all(&mods_dir)?;
     std::fs::create_dir_all(instance_dir.join("config"))?;
 
-    let client = reqwest::Client::new();
-
     // Download all listed files
     for file_entry in &index.files {
         let dest = instance_dir.join(&file_entry.path);
@@ -144,7 +143,7 @@ pub async fn install_mrpack(
         // Try each download URL
         let mut downloaded = false;
         for url in &file_entry.downloads {
-            match client.get(url).send().await {
+            match http_client.get(url).send().await {
                 Ok(resp) if resp.status().is_success() => {
                     let bytes = resp.bytes().await?;
                     std::fs::write(&dest, &bytes)?;

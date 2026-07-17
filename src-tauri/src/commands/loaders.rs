@@ -414,7 +414,7 @@ pub async fn install_mrpack_modpack(
 
     // Create instance directory and install modpack files
     let instance_dir = crate::utils::paths::instances_dir().join(&instance.id);
-    modpack::install_mrpack(&path, &instance_dir)
+    modpack::install_mrpack(&path, &instance_dir, &state.http)
         .await
         .map_err(|e| e.to_string())?;
 
