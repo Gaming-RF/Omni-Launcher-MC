@@ -11,11 +11,12 @@ use std::process::Stdio;
 pub struct GameLauncher {
     pub base_dir: PathBuf,
     pub java_path: PathBuf,
+    pub http_client: reqwest::Client,
 }
 
 impl GameLauncher {
-    pub fn new(base_dir: PathBuf, java_path: PathBuf) -> Self {
-        Self { base_dir, java_path }
+    pub fn new(base_dir: PathBuf, java_path: PathBuf, http_client: reqwest::Client) -> Self {
+        Self { base_dir, java_path, http_client }
     }
 
     fn versions_dir(&self) -> PathBuf {
@@ -37,7 +38,7 @@ impl GameLauncher {
     /// Prepare a game instance for launch: download version JSON, JAR, libraries, assets.
     pub async fn prepare(&self, instance: &GameInstance) -> Result<()> {
         // 1. Fetch version manifest and find the target version
-        let manifest = minecraft::fetch_version_manifest().await?;
+        let manifest = minecraft::fetch_version_manifest(Some(&self.http_client)).await?;
         let version_entry = manifest
             .versions
             .iter()
@@ -47,13 +48,14 @@ impl GameLauncher {
         // 2. Download and parse version JSON
         let version_dir = self.versions_dir().join(&instance.game_version);
         let version_json_path = version_dir.join(format!("{}.json", instance.game_version));
-        minecraft::download_file(&version_entry.url, &version_json_path).await?;
+        minecraft::download_file(Some(&self.http_client), &version_entry.url, &version_json_path).await?;
         let version_json = std::fs::read_to_string(&version_json_path)?;
         let version: minecraft::VersionDetails = serde_json::from_str(&version_json)?;
 
         // 3. Download client JAR
         let jar_path = version_dir.join(format!("{}.jar", instance.game_version));
         minecraft::download_file_verified(
+            Some(&self.http_client),
             &version.downloads.client.url,
             &jar_path,
             &version.downloads.client.sha1,
@@ -69,7 +71,7 @@ impl GameLauncher {
             if let Some(downloads) = &lib.downloads {
                 if let Some(artifact) = &downloads.artifact {
                     let path = self.libraries_dir().join(&artifact.path);
-                    minecraft::download_file_verified(&artifact.url, &path, &artifact.sha1)
+                    minecraft::download_file_verified(Some(&self.http_client), &artifact.url, &path, &artifact.sha1)
                         .await?;
                 }
             }
@@ -80,7 +82,7 @@ impl GameLauncher {
             .assets_dir()
             .join("indexes")
             .join(format!("{}.json", version.assets));
-        minecraft::download_file(&version.asset_index.url, &asset_index_path).await?;
+        minecraft::download_file(Some(&self.http_client), &version.asset_index.url, &asset_index_path).await?;
         let index_json = std::fs::read_to_string(&asset_index_path)?;
         let asset_index: minecraft::AssetIndexData = serde_json::from_str(&index_json)?;
 
@@ -95,7 +97,7 @@ impl GameLauncher {
                 "https://resources.download.minecraft.net/{}/{}",
                 hash_prefix, obj.hash
             );
-            minecraft::download_file_verified(&url, &asset_path, &obj.hash).await?;
+            minecraft::download_file_verified(Some(&self.http_client), &url, &asset_path, &obj.hash).await?;
         }
 
         // 6. Create instance game directory

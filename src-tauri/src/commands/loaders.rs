@@ -276,7 +276,7 @@ pub async fn install_mod_from_modrinth(
     std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
 
     let dest = mods_dir.join(&file.filename);
-    crate::api::minecraft::download_file(&file.url, &dest)
+    crate::api::minecraft::download_file(Some(&state.http), &file.url, &dest)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -518,7 +518,7 @@ pub async fn install_mod_from_curseforge(
     std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
 
     let dest = mods_dir.join(&file.file_name);
-    minecraft::download_file(download_url, &dest)
+    minecraft::download_file(Some(&state.http), download_url, &dest)
         .await
         .map_err(|e| e.to_string())?;
 

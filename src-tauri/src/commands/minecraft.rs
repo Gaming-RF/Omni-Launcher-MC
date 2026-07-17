@@ -16,8 +16,8 @@ pub struct VersionEntry {
 }
 
 #[tauri::command]
-pub async fn get_version_manifest() -> Result<Vec<VersionEntry>, String> {
-    let manifest = minecraft::fetch_version_manifest()
+pub async fn get_version_manifest(state: State<'_, AppState>) -> Result<Vec<VersionEntry>, String> {
+    let manifest = minecraft::fetch_version_manifest(Some(&state.http))
         .await
         .map_err(|e| e.to_string())?;
 
@@ -61,7 +61,7 @@ pub async fn prepare_instance(
         .await
         .map_err(|e| e.to_string())?;
 
-    let game_launcher = launcher::GameLauncher::new(base_dir, java_path);
+    let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Emit progress: downloading version JSON
     {
@@ -132,7 +132,7 @@ pub async fn launch_game(
         .await
         .map_err(|e| e.to_string())?;
 
-    let game_launcher = launcher::GameLauncher::new(base_dir, java_path);
+    let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Prepare (download assets if needed)
     {
@@ -373,7 +373,7 @@ pub async fn launch_game_offline(
         .await
         .map_err(|e| e.to_string())?;
 
-    let game_launcher = launcher::GameLauncher::new(base_dir, java_path);
+    let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Prepare (download assets if needed)
     {

@@ -3,6 +3,10 @@ use rusqlite::Connection;
 
 /// Run all database migrations. Safe to call multiple times.
 pub fn run_migrations(db: &Connection) -> Result<()> {
+    // Enable WAL mode for better concurrent read/write performance.
+    // WAL allows readers to proceed while a write is in progress.
+    db.execute_batch("PRAGMA journal_mode=WAL;")?;
+
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS accounts (
             uuid TEXT PRIMARY KEY NOT NULL,

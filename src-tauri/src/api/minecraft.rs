@@ -6,6 +6,17 @@ const VERSION_MANIFEST_URL: &str =
     "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 const USER_AGENT: &str = "OmniLauncherMC/0.1.0 (github.com/OmniLauncherMC)";
 
+/// Get an HTTP client: use the shared one if provided, otherwise create a new one.
+fn get_client(client: Option<&reqwest::Client>) -> reqwest::Client {
+    client.cloned().unwrap_or_else(|| {
+        reqwest::Client::builder()
+            .user_agent(USER_AGENT)
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .expect("Failed to build HTTP client")
+    })
+}
+
 // ── Types ──────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -134,8 +145,8 @@ pub struct AssetObject {
 // ── API Functions ──────────────────────────────────────────────
 
 /// Fetch the Minecraft version manifest from Mojang.
-pub async fn fetch_version_manifest() -> Result<VersionManifest> {
-    let client = reqwest::Client::new();
+pub async fn fetch_version_manifest(client: Option<&reqwest::Client>) -> Result<VersionManifest> {
+    let client = get_client(client);
     let manifest: VersionManifest = client
         .get(VERSION_MANIFEST_URL)
         .header("User-Agent", USER_AGENT)
@@ -149,8 +160,8 @@ pub async fn fetch_version_manifest() -> Result<VersionManifest> {
 }
 
 /// Fetch details for a specific version (by URL from the manifest).
-pub async fn fetch_version_details(version_url: &str) -> Result<VersionDetails> {
-    let client = reqwest::Client::new();
+pub async fn fetch_version_details(client: Option<&reqwest::Client>, version_url: &str) -> Result<VersionDetails> {
+    let client = get_client(client);
     let details: VersionDetails = client
         .get(version_url)
         .header("User-Agent", USER_AGENT)
@@ -164,8 +175,8 @@ pub async fn fetch_version_details(version_url: &str) -> Result<VersionDetails> 
 }
 
 /// Fetch an asset index.
-pub async fn fetch_asset_index(index_url: &str) -> Result<AssetIndexData> {
-    let client = reqwest::Client::new();
+pub async fn fetch_asset_index(client: Option<&reqwest::Client>, index_url: &str) -> Result<AssetIndexData> {
+    let client = get_client(client);
     let index: AssetIndexData = client
         .get(index_url)
         .header("User-Agent", USER_AGENT)
@@ -179,12 +190,12 @@ pub async fn fetch_asset_index(index_url: &str) -> Result<AssetIndexData> {
 }
 
 /// Download a file from a URL to a local path, creating parent directories.
-pub async fn download_file(url: &str, dest: &Path) -> Result<()> {
+pub async fn download_file(client: Option<&reqwest::Client>, url: &str, dest: &Path) -> Result<()> {
     if dest.exists() {
         return Ok(()); // Already downloaded
     }
 
-    let client = reqwest::Client::new();
+    let client = get_client(client);
     let resp = client
         .get(url)
         .header("User-Agent", USER_AGENT)
@@ -207,13 +218,14 @@ pub async fn download_file(url: &str, dest: &Path) -> Result<()> {
 
 /// Download a file with SHA1 verification.
 pub async fn download_file_verified(
+    client: Option<&reqwest::Client>,
     url: &str,
     dest: &Path,
     expected_sha1: &str,
 ) -> Result<()> {
     use sha1::{Digest, Sha1};
 
-    download_file(url, dest).await?;
+    download_file(client, url, dest).await?;
 
     // Verify hash
     let data = std::fs::read(dest)?;
