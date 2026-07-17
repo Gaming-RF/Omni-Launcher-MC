@@ -12,6 +12,7 @@ import {
   Loader2,
   Search,
   Check,
+  Terminal,
 } from "lucide-react";
 import type {
   InstanceListItem,
@@ -33,10 +34,15 @@ import {
   installQuiltLoader,
   installForgeLoader,
   installNeoForgeLoader,
+  isInstanceRunning,
 } from "../lib/tauri";
+import { listen } from "@tauri-apps/api/event";
+import { useNavigate } from "react-router-dom";
 import { useInstancesStore } from "../stores/instances";
+import { useActiveAccount } from "../hooks/useActiveAccount";
+import { GameConsole } from "../components/instance/GameConsole";
 
-type Tab = "mods" | "loader" | "settings";
+type Tab = "mods" | "loader" | "settings" | "console";
 
 interface Props {
   instance: InstanceListItem;
@@ -46,6 +52,30 @@ interface Props {
 export function InstanceDetail({ instance, onBack }: Props) {
   const [tab, setTab] = useState<Tab>("mods");
   const launchGame = useInstancesStore((s) => s.launchGame);
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Check initial running state and subscribe to game events
+  useEffect(() => {
+    isInstanceRunning(instance.id).then(setIsRunning).catch(() => {});
+
+    const unlistenStart = listen<{ instance_id: string }>("game-log", (event) => {
+      if (event.payload.instance_id === instance.id) setIsRunning(true);
+    });
+
+    const unlistenExit = listen<{ instance_id: string; exit_code: number | null }>(
+      "game-exit",
+      (event) => {
+        if (event.payload.instance_id === instance.id) setIsRunning(false);
+      }
+    );
+
+    return () => {
+      unlistenStart.then((fn) => fn());
+      unlistenExit.then((fn) => fn());
+    };
+  }, [instance.id]);
+  const { hasAccount } = useActiveAccount();
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-4">
@@ -64,22 +94,31 @@ export function InstanceDetail({ instance, onBack }: Props) {
             {instance.loader_version ? ` ${instance.loader_version}` : ""}
           </p>
         </div>
-        <button
-          onClick={() => launchGame(instance.id)}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <Play size={16} />
-          Play
-        </button>
+        {hasAccount ? (
+          <button
+            onClick={() => launchGame(instance.id)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Play size={16} />
+            Play
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate("/settings")}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Sign in to launch
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-700">
-        {(["mods", "loader", "settings"] as Tab[]).map((t) => (
+        {(["mods", "loader", "settings", "console"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors ${
+            className={`px-4 py-2 text-sm font-medium capitalize transition-colors relative ${
               tab === t
                 ? "text-white border-b-2 border-blue-500"
                 : "text-slate-400 hover:text-slate-200"
@@ -88,7 +127,14 @@ export function InstanceDetail({ instance, onBack }: Props) {
             {t === "mods" && <Puzzle size={14} className="inline mr-1.5" />}
             {t === "loader" && <Package size={14} className="inline mr-1.5" />}
             {t === "settings" && <Settings size={14} className="inline mr-1.5" />}
+            {t === "console" && <Terminal size={14} className="inline mr-1.5" />}
             {t}
+            {t === "console" && isRunning && (
+              <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                Running
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -97,6 +143,7 @@ export function InstanceDetail({ instance, onBack }: Props) {
       {tab === "mods" && <ModsTab instance={instance} />}
       {tab === "loader" && <LoaderTab instance={instance} />}
       {tab === "settings" && <SettingsTab instance={instance} />}
+      {tab === "console" && <GameConsole instanceId={instance.id} />}
     </div>
   );
 }

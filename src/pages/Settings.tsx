@@ -11,6 +11,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  LogIn,
 } from "lucide-react";
 import JavaPicker from "../components/common/JavaPicker";
 
@@ -81,7 +82,7 @@ export function Settings() {
           Account
         </h2>
 
-        {activeAccount && (
+        {activeAccount ? (
           <div className="flex items-center gap-3 bg-slate-900 rounded-lg p-3 mb-4">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
               {activeAccount.username.charAt(0)}
@@ -92,7 +93,17 @@ export function Settings() {
             </div>
             <CheckCircle size={16} className="ml-auto text-emerald-400" />
           </div>
-        )}
+        ) : loginStatus === "idle" ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-blue-600/15 flex items-center justify-center mb-4">
+              <LogIn size={24} className="text-blue-400" />
+            </div>
+            <p className="text-white font-medium mb-1">No account signed in</p>
+            <p className="text-slate-400 text-sm mb-4">
+              Sign in with your Microsoft account to launch Minecraft
+            </p>
+          </div>
+        ) : null}
 
         {loginStatus === "pending" && userCode ? (
           <div className="bg-slate-900 rounded-lg p-4 space-y-3">

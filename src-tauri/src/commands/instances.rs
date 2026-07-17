@@ -156,3 +156,90 @@ pub fn update_setting(
     db::settings::set_setting(&db, &key, &value).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn duplicate_instance(
+    state: State<'_, AppState>,
+    instance_id: String,
+    new_name: String,
+) -> Result<InstanceListItem, String> {
+    let (original, mods) = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let original = db::instances::get_instance(&db, &instance_id)
+            .map_err(|e| e.to_string())?
+            .ok_or("Instance not found")?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id)
+            .map_err(|e| e.to_string())?;
+        (original, mods)
+    };
+
+    // Create new instance in DB with same settings
+    let new_instance = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::instances::create_instance(
+            &db,
+            db::instances::CreateInstanceParams {
+                name: new_name,
+                game_version: original.game_version,
+                loader: original.loader,
+                loader_version: original.loader_version,
+                icon: original.icon,
+                java_args: original.java_args,
+                allocated_memory_mb: original.allocated_memory_mb,
+            },
+        )
+        .map_err(|e| e.to_string())?
+    };
+
+    // Copy instance directory
+    let base = crate::utils::paths::data_dir();
+    let src = base.join("instances").join(&instance_id);
+    let dst = base.join("instances").join(&new_instance.id);
+    if src.exists() {
+        copy_dir_all(&src, &dst).map_err(|e| e.to_string())?;
+    }
+
+    // Copy mods to DB
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        for m in mods {
+            db::mods::record_mod_install(
+                &db,
+                &new_instance.id,
+                &m.mod_id,
+                &m.source,
+                &m.name,
+                &m.version,
+                &m.file_name,
+            )
+            .ok();
+        }
+    }
+
+    Ok(InstanceListItem {
+        id: new_instance.id,
+        name: new_instance.name,
+        game_version: new_instance.game_version,
+        loader: new_instance.loader,
+        loader_version: new_instance.loader_version,
+        icon: new_instance.icon,
+        created_at: new_instance.created_at,
+        last_played: new_instance.last_played,
+        play_time_secs: new_instance.play_time_secs,
+        allocated_memory_mb: new_instance.allocated_memory_mb,
+    })
+}
+
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}

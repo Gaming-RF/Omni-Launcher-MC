@@ -343,6 +343,33 @@ export async function importInstanceShare(code: string): Promise<InstanceListIte
   return invoke("import_instance_share", { payload: { code } });
 }
 
+// ── Game Process ───────────────────────────────────────────────
+
+export async function getGameLogs(instanceId: string): Promise<string[]> {
+  return invoke("get_game_logs", { instanceId });
+}
+
+export async function getRunningInstances(): Promise<string[]> {
+  return invoke("get_running_instances");
+}
+
+export async function isInstanceRunning(id: string): Promise<boolean> {
+  return invoke("is_instance_running", { id });
+}
+
+export async function killGame(id: string): Promise<void> {
+  return invoke("kill_game", { id });
+}
+
+// ── Instance Duplication ─────────────────────────────────────
+
+export async function duplicateInstance(
+  instanceId: string,
+  newName: string
+): Promise<InstanceListItem> {
+  return invoke("duplicate_instance", { instanceId, newName });
+}
+
 // ── Aggregated Search ─────────────────────────────────────────
 
 export interface AggregatedSearchResult {

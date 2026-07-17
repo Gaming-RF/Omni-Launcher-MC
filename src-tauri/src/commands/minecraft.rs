@@ -157,7 +157,7 @@ pub async fn launch_game(
         }
     }
 
-    let pid = game_launcher
+    let (pid, child) = game_launcher
         .launch(
             &instance,
             &account.access_token,
@@ -166,6 +166,14 @@ pub async fn launch_game(
         )
         .await
         .map_err(|e| e.to_string())?;
+
+    // Register the child process with the process manager
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            state.process_manager.spawn(app, &instance_id, child, pid);
+        }
+    }
 
     // Emit completion
     {

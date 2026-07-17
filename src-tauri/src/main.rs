@@ -15,6 +15,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// App handle for emitting events (progress, notifications).
     pub app_handle: Mutex<Option<tauri::AppHandle>>,
+    /// Tracks running game processes, captures stdout/stderr.
+    pub process_manager: utils::process_manager::ProcessManager,
 }
 
 fn main() {
@@ -28,6 +30,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             // Initialize data directories
             let data_dir = utils::paths::data_dir();
@@ -55,6 +58,7 @@ fn main() {
                 db: Mutex::new(conn),
                 http: http_client,
                 app_handle: Mutex::new(Some(app.handle().clone())),
+                process_manager: utils::process_manager::ProcessManager::new(),
             });
 
             log::info!("OmniLauncherMC initialized. Data dir: {:?}", data_dir);
@@ -103,6 +107,12 @@ fn main() {
             commands::java::get_required_java_version,
             commands::java::ensure_java_for_mc,
             commands::java::download_java_version,
+            // Process management commands
+            commands::process::get_running_instances,
+            commands::process::kill_game,
+            commands::process::get_game_logs,
+            // Instance management commands
+            commands::instances::duplicate_instance,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");

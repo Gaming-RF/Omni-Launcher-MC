@@ -15,6 +15,13 @@
 - [x] Modpack import (Modrinth .mrpack + CurseForge) (implemented)
 - [x] All 4 mod loader installers (Fabric/Quilt/Forge/NeoForge) (implemented)
 - [x] CI/CD pipeline (GitHub Actions) (implemented)
+- [x] Game console/log viewer with live streaming (implemented)
+- [x] Process manager: track running games, kill instances (implemented)
+- [x] Instance search, filter by loader, sort on Home page (implemented)
+- [x] Instance duplication/clone (implemented)
+- [x] Offline mode: graceful UI when no account logged in (implemented)
+- [x] Window state persistence (tauri-plugin-window-state) (implemented)
+- [x] Keyboard shortcuts (Ctrl+N, Ctrl+K, Ctrl+L, Ctrl+,) (implemented)
 
 ## 🔴 Required Before First Use
 

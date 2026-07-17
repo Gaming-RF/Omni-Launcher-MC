@@ -4,6 +4,7 @@ use tokio::process::Command;
 
 use crate::api::minecraft;
 use crate::db::instances::GameInstance;
+use std::process::Stdio;
 
 /// The main game launcher. Handles downloading version files, assets, libraries,
 /// assembling classpath, building JVM/game args, and launching the process.
@@ -104,14 +105,14 @@ impl GameLauncher {
         Ok(())
     }
 
-    /// Launch a prepared game instance. Returns the child process PID.
+    /// Launch a prepared game instance. Returns the child process PID and the Child handle.
     pub async fn launch(
         &self,
         instance: &GameInstance,
         access_token: &str,
         username: &str,
         uuid: &str,
-    ) -> Result<u32> {
+    ) -> Result<(u32, tokio::process::Child)> {
         let version_dir = self.versions_dir().join(&instance.game_version);
         let version_json_path = version_dir.join(format!("{}.json", instance.game_version));
         let version_json = std::fs::read_to_string(&version_json_path)?;
@@ -227,23 +228,15 @@ impl GameLauncher {
         let child = Command::new(&self.java_path)
             .args(&cmd_args)
             .current_dir(&instance_dir)
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .context("Failed to start Java process. Is Java installed?")?;
 
         let pid = child.id().context("Failed to get process ID")?;
 
-        // Spawn a task to wait on the process
-        tokio::spawn(async move {
-            let output = child.wait_with_output().await;
-            match output {
-                Ok(status) => log::info!("Minecraft exited with: {}", status.status),
-                Err(e) => log::error!("Minecraft process error: {}", e),
-            }
-        });
-
-        Ok(pid)
+        Ok((pid, child))
     }
 }
 

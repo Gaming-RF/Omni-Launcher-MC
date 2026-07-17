@@ -3,3 +3,4 @@ pub mod instances;
 pub mod java;
 pub mod loaders;
 pub mod minecraft;
+pub mod process;

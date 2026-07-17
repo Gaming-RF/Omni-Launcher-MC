@@ -7,6 +7,7 @@ import { Settings } from "./pages/Settings";
 import { InstanceDetailPage } from "./pages/InstanceDetailPage";
 import { useAppInit } from "./hooks/useAppInit";
 import { useDownloadProgress } from "./hooks/useDownloadProgress";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useNotificationStore } from "./stores/notificationStore";
 import { DownloadProgress } from "./components/common/DownloadProgress";
 import { ToastContainer } from "./components/common/Toast";
@@ -14,6 +15,7 @@ import { ToastContainer } from "./components/common/Toast";
 export default function App() {
   const { init } = useAppInit();
   const handleProgress = useNotificationStore((s) => s.handleProgress);
+  useKeyboardShortcuts();
 
   useEffect(() => {
     init();
