@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
+import DownloadPanel from "./components/common/DownloadPanel";
 import { Home } from "./pages/Home";
 import { Discover } from "./pages/Discover";
 import { Settings } from "./pages/Settings";
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
+      <DownloadPanel />
     </div>
   );
 }

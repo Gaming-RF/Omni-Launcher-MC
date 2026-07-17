@@ -1,13 +1,29 @@
-import { Play, Settings, Trash2, Clock } from "lucide-react";
+import { useState } from "react";
+import { Play, Trash2, Clock, ChevronRight } from "lucide-react";
 import { InstanceCreator } from "../components/instance/InstanceCreator";
+import { InstanceDetail } from "./InstanceDetail";
 import { useInstancesStore } from "../stores/instances";
 import { useAuthStore } from "../stores/auth";
+import type { InstanceListItem } from "../lib/tauri";
 
 export function Home() {
   const instances = useInstancesStore((s) => s.instances);
   const deleteInstance = useInstancesStore((s) => s.deleteInstance);
   const launchGame = useInstancesStore((s) => s.launchGame);
   const activeAccount = useAuthStore((s) => s.activeAccount);
+  const [selectedInstance, setSelectedInstance] = useState<InstanceListItem | null>(null);
+
+  // If an instance is selected, show the detail view
+  if (selectedInstance) {
+    // Find the latest version from the store (in case it was updated)
+    const latest = instances.find((i) => i.id === selectedInstance.id);
+    return (
+      <InstanceDetail
+        instance={latest || selectedInstance}
+        onBack={() => setSelectedInstance(null)}
+      />
+    );
+  }
 
   const formatPlayTime = (secs: number) => {
     if (secs < 60) return `${secs}s`;
@@ -46,7 +62,8 @@ export function Home() {
           {instances.map((instance) => (
             <div
               key={instance.id}
-              className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors group"
+              onClick={() => setSelectedInstance(instance)}
+              className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors group cursor-pointer"
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -65,13 +82,22 @@ export function Home() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteInstance(instance.id)}
-                  className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1"
-                  title="Delete instance"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteInstance(instance.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1"
+                    title="Delete instance"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                  <ChevronRight
+                    size={16}
+                    className="text-slate-600 group-hover:text-slate-400 transition-colors"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-between">
@@ -81,20 +107,15 @@ export function Home() {
                   <span className="mx-1">&middot;</span>
                   <span>{instance.allocated_memory_mb}MB RAM</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="text-slate-500 hover:text-slate-300 p-1"
-                    title="Settings"
-                  >
-                    <Settings size={14} />
-                  </button>
-                  <button
-                    onClick={() => launchGame(instance.id)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Play
-                  </button>
-                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    launchGame(instance.id);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Play
+                </button>
               </div>
             </div>
           ))}

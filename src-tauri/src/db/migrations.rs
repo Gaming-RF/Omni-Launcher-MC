@@ -51,8 +51,30 @@ pub fn run_migrations(db: &Connection) -> Result<()> {
         INSERT OR IGNORE INTO settings (key, value) VALUES ('default_memory_mb', '4096');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('theme', 'dark');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('language', 'en');
-        INSERT OR IGNORE INTO settings (key, value) VALUES ('default_resolution', '1920x1080');",
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('default_resolution', '1920x1080');
+
+        -- Java installations table (for multi-Java management)
+        CREATE TABLE IF NOT EXISTS java_installations (
+            id TEXT PRIMARY KEY NOT NULL,
+            path TEXT NOT NULL,
+            major_version INTEGER NOT NULL,
+            arch TEXT NOT NULL,
+            vendor TEXT NOT NULL,
+            is_auto_downloaded INTEGER NOT NULL DEFAULT 0,
+            detected_at TEXT NOT NULL
+        );",
     )?;
+
+    // Add per-instance Java override column if missing.
+    // SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we catch the error.
+    match db.execute_batch(
+        "ALTER TABLE instances ADD COLUMN java_installation_id TEXT;",
+    ) {
+        Ok(()) => log::info!("Added java_installation_id column to instances table"),
+        Err(_) => {
+            // Column already exists — this is expected on subsequent runs
+        }
+    }
 
     Ok(())
 }

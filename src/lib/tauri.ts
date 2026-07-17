@@ -167,3 +167,107 @@ export async function getSettings(): Promise<SettingsInfo> {
 export async function updateSetting(key: string, value: string): Promise<void> {
   return invoke("update_setting", { key, value });
 }
+
+// ── Mod Loader Versions ───────────────────────────────────────
+
+export interface LoaderVersionInfo {
+  version: string;
+  stable: boolean;
+}
+
+export async function getFabricLoaderVersions(
+  mcVersion: string
+): Promise<LoaderVersionInfo[]> {
+  return invoke("get_fabric_loader_versions", { mcVersion });
+}
+
+export async function getQuiltLoaderVersions(
+  mcVersion: string
+): Promise<LoaderVersionInfo[]> {
+  return invoke("get_quilt_loader_versions", { mcVersion });
+}
+
+export async function getForgeVersions(mcVersion: string): Promise<string[]> {
+  return invoke("get_forge_versions", { mcVersion });
+}
+
+export async function getNeoForgeVersions(mcVersion: string): Promise<string[]> {
+  return invoke("get_neoforge_versions", { mcVersion });
+}
+
+// ── Loader Installation ───────────────────────────────────────
+
+export async function installFabricLoader(
+  instanceId: string,
+  loaderVersion: string
+): Promise<string> {
+  return invoke("install_fabric_loader", { instanceId, loaderVersion });
+}
+
+export async function installQuiltLoader(
+  instanceId: string,
+  loaderVersion: string
+): Promise<string> {
+  return invoke("install_quilt_loader", { instanceId, loaderVersion });
+}
+
+export async function installForgeLoader(
+  instanceId: string,
+  forgeVersion: string
+): Promise<string> {
+  return invoke("install_forge_loader", { instanceId, forgeVersion });
+}
+
+export async function installNeoForgeLoader(
+  instanceId: string,
+  neoforgeVersion: string
+): Promise<string> {
+  return invoke("install_neoforge_loader", { instanceId, neoforgeVersion });
+}
+
+// ── Per-Instance Mod Management ───────────────────────────────
+
+export interface InstalledModInfo {
+  id: number;
+  mod_id: string;
+  source: string;
+  name: string;
+  version: string;
+  file_name: string;
+  enabled: boolean;
+  installed_at: string;
+}
+
+export async function getInstanceMods(
+  instanceId: string
+): Promise<InstalledModInfo[]> {
+  return invoke("get_instance_mods", { instanceId });
+}
+
+export async function installModFromModrinth(
+  instanceId: string,
+  projectId: string,
+  gameVersion: string,
+  loader: string
+): Promise<InstalledModInfo> {
+  return invoke("install_mod_from_modrinth", {
+    instanceId,
+    projectId,
+    gameVersion,
+    loader,
+  });
+}
+
+export async function toggleModEnabled(
+  modId: number,
+  instanceId: string
+): Promise<boolean> {
+  return invoke("toggle_mod_enabled", { modId, instanceId });
+}
+
+export async function removeMod(
+  modId: number,
+  instanceId: string
+): Promise<void> {
+  return invoke("remove_mod", { modId, instanceId });
+}

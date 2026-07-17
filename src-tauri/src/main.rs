@@ -11,6 +11,9 @@ use tauri::Manager;
 /// Application state shared across commands via Tauri managed state.
 pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
+    /// Shared HTTP client with connection pooling. All API modules should use this
+    /// instead of creating their own `reqwest::Client::new()`.
+    pub http: reqwest::Client,
 }
 
 fn main() {
@@ -38,9 +41,18 @@ fn main() {
             let conn = rusqlite::Connection::open(&db_path)?;
             db::migrations::run_migrations(&conn)?;
 
+            // Build shared HTTP client with connection pooling
+            let http_client = reqwest::Client::builder()
+                .user_agent("OmniLauncherMC/0.1.0 (github.com/OmniLauncherMC)")
+                .timeout(std::time::Duration::from_secs(30))
+                .pool_max_idle_per_host(8)
+                .build()
+                .expect("Failed to build HTTP client");
+
             // Store connection in managed state
             app.manage(AppState {
                 db: Mutex::new(conn),
+                http: http_client,
             });
 
             log::info!("OmniLauncherMC initialized. Data dir: {:?}", data_dir);
@@ -62,13 +74,37 @@ fn main() {
             commands::minecraft::launch_game,
             commands::minecraft::prepare_instance,
             commands::minecraft::check_java,
-            // Modrinth commands
             commands::minecraft::modrinth_search,
-            // CurseForge commands
             commands::minecraft::curseforge_search,
             // Settings commands
             commands::instances::get_settings,
             commands::instances::update_setting,
+            // Loader commands
+            commands::loaders::get_fabric_loader_versions,
+            commands::loaders::get_quilt_loader_versions,
+            commands::loaders::get_forge_versions,
+            commands::loaders::get_neoforge_versions,
+            commands::loaders::install_fabric_loader,
+            commands::loaders::install_quilt_loader,
+            commands::loaders::install_forge_loader,
+            commands::loaders::install_neoforge_loader,
+            // Mod management commands
+            commands::loaders::get_instance_mods,
+            commands::loaders::install_mod_from_modrinth,
+            commands::loaders::toggle_mod_enabled,
+            commands::loaders::remove_mod,
+            // Java management commands
+            commands::java::detect_java_installations,
+            commands::java::auto_download_java,
+            commands::java::find_java_for_mc,
+            commands::java::fetch_loader_versions,
+            commands::java::install_mod_loader,
+            commands::java::parse_mrpack_file,
+            commands::java::parse_cf_modpack_file,
+            // Aggregated search + sharing
+            commands::minecraft::aggregated_search,
+            commands::minecraft::export_instance_share,
+            commands::minecraft::import_instance_share,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");

@@ -1,8 +1,10 @@
+use crate::api::aggregator;
 use crate::api::minecraft;
 use crate::api::modrinth;
 use crate::api::curseforge;
 use crate::db;
 use crate::utils::launcher;
+use crate::utils::sharing;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -215,4 +217,162 @@ pub async fn curseforge_search(
                 .collect(),
         })
         .collect())
+}
+
+// ── Aggregated search (Modrinth + CurseForge) ─────────────────
+
+#[derive(Serialize)]
+pub struct AggregatedSearchResult {
+    pub source: String,
+    pub project_id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: String,
+    pub downloads: u64,
+    pub categories: Vec<String>,
+}
+
+/// Search both Modrinth and CurseForge concurrently, merge and deduplicate.
+#[tauri::command]
+pub async fn aggregated_search(
+    state: State<'_, AppState>,
+    query: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+) -> Result<Vec<AggregatedSearchResult>, String> {
+    let curseforge_key = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::settings::get_curseforge_api_key(&db)
+            .map_err(|e| e.to_string())
+            .ok()
+            .flatten()
+    };
+
+    let results = aggregator::aggregated_search(
+        &query,
+        offset.unwrap_or(0),
+        limit.unwrap_or(20),
+        curseforge_key.as_deref(),
+        offset.unwrap_or(0) as i32,
+        limit.unwrap_or(20) as i32,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| AggregatedSearchResult {
+            source: r.source,
+            project_id: r.project_id,
+            slug: r.slug,
+            title: r.title,
+            description: r.description,
+            icon_url: r.icon_url,
+            downloads: r.downloads,
+            categories: r.categories,
+        })
+        .collect())
+}
+
+// ── Instance sharing ──────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct ShareCode {
+    pub code: String,
+    pub name: String,
+    pub mod_count: usize,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ImportSharePayload {
+    pub code: String,
+}
+
+/// Export an instance as a share code.
+#[tauri::command]
+pub async fn export_instance_share(
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<ShareCode, String> {
+    let (instance, mods) = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let instance = db::instances::get_instance(&db, &instance_id)
+            .map_err(|e| e.to_string())?
+            .ok_or("Instance not found")?;
+
+        let mods = db::instances::get_instance_mods(&db, &instance_id)
+            .map_err(|e| e.to_string())?;
+
+        (instance, mods)
+    };
+
+    let shared_mods: Vec<sharing::SharedMod> = mods
+        .into_iter()
+        .map(|m| sharing::SharedMod {
+            source: m.source,
+            project_id: m.mod_id,
+            version_id: String::new(),
+            name: m.name,
+            file_name: m.file_name,
+        })
+        .collect();
+
+    let mod_count = shared_mods.len();
+
+    let code = sharing::export_instance(
+        &instance.name,
+        &instance.game_version,
+        &instance.loader,
+        &instance.loader_version.as_deref().unwrap_or(""),
+        instance.allocated_memory_mb,
+        instance.java_args.as_deref(),
+        instance.resolution.as_deref(),
+        instance.notes.as_deref(),
+        shared_mods,
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(ShareCode {
+        code,
+        name: instance.name,
+        mod_count,
+    })
+}
+
+/// Import an instance from a share code.
+#[tauri::command]
+pub async fn import_instance_share(
+    state: State<'_, AppState>,
+    payload: ImportSharePayload,
+) -> Result<InstanceListItem, String> {
+    let parsed = sharing::import_instance(&payload.code).map_err(|e| e.to_string())?;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let instance = db::instances::create_instance(
+        &db,
+        db::instances::CreateInstanceParams {
+            name: parsed.name,
+            game_version: parsed.game_version,
+            loader: parsed.loader,
+            loader_version: Some(parsed.loader_version).filter(|s| !s.is_empty()),
+            icon: None,
+            java_args: parsed.java_args,
+            allocated_memory_mb: parsed.allocated_memory_mb,
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(InstanceListItem {
+        id: instance.id,
+        name: instance.name,
+        game_version: instance.game_version,
+        loader: instance.loader,
+        loader_version: instance.loader_version,
+        icon: instance.icon,
+        created_at: instance.created_at,
+        last_played: instance.last_played,
+        play_time_secs: instance.play_time_secs,
+        allocated_memory_mb: instance.allocated_memory_mb,
+    })
 }
