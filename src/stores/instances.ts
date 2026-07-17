@@ -56,8 +56,7 @@ export const useInstancesStore = create<InstancesState>((set, get) => ({
     try {
       // Prepare (download assets etc.) then launch
       await tauri.prepareInstance(instanceId);
-      const pid = await tauri.launchGame(instanceId);
-      console.log(`Game launched with PID ${pid}`);
+      await tauri.launchGame(instanceId);
     } catch (err) {
       set({ error: String(err) });
     }
@@ -67,8 +66,7 @@ export const useInstancesStore = create<InstancesState>((set, get) => ({
     set({ error: null });
     try {
       await tauri.prepareInstance(instanceId);
-      const pid = await tauri.launchGameOffline(instanceId, username);
-      console.log(`Game launched offline as ${username} (PID ${pid})`);
+      await tauri.launchGameOffline(instanceId, username);
     } catch (err) {
       set({ error: String(err) });
     }
