@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSettingsStore } from "../stores/settings";
 import { startLogin, pollLogin } from "../lib/tauri";
 import { useAuthStore } from "../stores/auth";
@@ -25,24 +25,36 @@ export function Settings() {
   const [verificationUri, setVerificationUri] = useState<string | null>(null);
   const [loginStatus, setLoginStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
-  const handleLogin = async () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const handleLogin = useCallback(async () => {
     setLoginStatus("pending");
     setLoginError(null);
     try {
       const response = await startLogin();
+      if (!mountedRef.current) return;
       setUserCode(response.user_code);
       setVerificationUri(response.verification_uri);
 
-      // Start polling
+      // Start polling with unmount-safe scheduling
       const poll = async () => {
+        if (!mountedRef.current) return;
         try {
           await pollLogin();
+          if (!mountedRef.current) return;
           fetchAccounts();
           setLoginStatus("success");
           setUserCode(null);
           setVerificationUri(null);
         } catch (err) {
+          if (!mountedRef.current) return;
           const msg = String(err);
           if (msg.includes("authorization_pending") || msg.includes("slow_down")) {
             setTimeout(poll, 5000);
@@ -54,10 +66,11 @@ export function Settings() {
       };
       setTimeout(poll, 5000);
     } catch (err) {
+      if (!mountedRef.current) return;
       setLoginStatus("error");
       setLoginError(String(err));
     }
-  };
+  }, [fetchAccounts]);
 
   const [javaPath, setJavaPath] = useState(settings?.java_path ?? "");
   const [cfKey, setCfKey] = useState(settings?.curseforge_api_key ?? "");
