@@ -109,6 +109,13 @@ export async function launchGame(instanceId: string): Promise<number> {
   return invoke("launch_game", { instanceId });
 }
 
+export async function launchGameOffline(
+  instanceId: string,
+  username: string
+): Promise<number> {
+  return invoke("launch_game_offline", { instanceId, username });
+}
+
 export async function checkJava(): Promise<JavaInfo> {
   return invoke("check_java");
 }

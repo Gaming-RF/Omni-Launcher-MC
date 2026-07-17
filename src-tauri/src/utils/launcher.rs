@@ -112,6 +112,7 @@ impl GameLauncher {
         access_token: &str,
         username: &str,
         uuid: &str,
+        is_offline: bool,
     ) -> Result<(u32, tokio::process::Child)> {
         let version_dir = self.versions_dir().join(&instance.game_version);
         let version_json_path = version_dir.join(format!("{}.json", instance.game_version));
@@ -186,7 +187,7 @@ impl GameLauncher {
             ("${game_assets}", &game_assets_str),
             ("${assets_root}", &assets_root),
             ("${assets_index_name}", assets_id),
-            ("${user_type}", "msa"),
+            ("${user_type}", if is_offline { "mojang" } else { "msa" }),
             ("${user_properties}", "{}"),
             ("${version_type}", &version.version_type),
             ("${launcher_name}", "OmniLauncherMC"),

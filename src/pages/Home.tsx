@@ -6,11 +6,11 @@ import {
   Share2,
   Download,
   X,
-  Info,
   Search,
   SlidersHorizontal,
   ArrowUpDown,
   Gamepad2,
+  User,
 } from "lucide-react";
 import { InstanceCreator } from "../components/instance/InstanceCreator";
 import { InstanceDetail } from "./InstanceDetail";
@@ -36,12 +36,17 @@ export function Home() {
   const instances = useInstancesStore((s) => s.instances);
   const deleteInstance = useInstancesStore((s) => s.deleteInstance);
   const launchGame = useInstancesStore((s) => s.launchGame);
+  const launchGameOffline = useInstancesStore((s) => s.launchGameOffline);
   const { hasAccount } = useActiveAccount();
   const navigate = useNavigate();
   const [showSignInBanner, setShowSignInBanner] = useState(true);
   const [selectedInstance, setSelectedInstance] = useState<InstanceListItem | null>(null);
   const [shareInstance, setShareInstance] = useState<InstanceListItem | null>(null);
   const [showImport, setShowImport] = useState(false);
+  const [offlineDialog, setOfflineDialog] = useState<string | null>(null);
+  const [offlineUsername, setOfflineUsername] = useState(() =>
+    localStorage.getItem("offline-username") || ""
+  );
 
   // Search / filter / sort state
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,22 +142,22 @@ export function Home() {
   return (
     <>
     <div className="space-y-6">
-      {/* Offline / no-account banner */}
+      {/* Offline mode tip when no account */}
       {!hasAccount && showSignInBanner && (
-        <div className="flex items-center gap-3 bg-blue-600/15 border border-blue-500/30 rounded-lg px-4 py-3 text-sm">
-          <Info size={18} className="text-blue-400 flex-shrink-0" />
-          <span className="text-blue-200">
-            Sign in with Microsoft to play Minecraft
+        <div className="flex items-center gap-3 bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-sm">
+          <User size={18} className="text-emerald-400 flex-shrink-0" />
+          <span className="text-slate-300">
+            Offline mode — click <strong>Play</strong> on any instance to launch with a username
           </span>
           <button
             onClick={() => navigate("/settings")}
-            className="ml-auto bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            className="ml-auto bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
           >
-            Sign in
+            Sign in with Microsoft
           </button>
           <button
             onClick={() => setShowSignInBanner(false)}
-            className="text-blue-400 hover:text-blue-300 p-0.5 transition-colors"
+            className="text-slate-500 hover:text-slate-300 p-0.5 transition-colors"
           >
             <X size={14} />
           </button>
@@ -328,20 +333,14 @@ export function Home() {
                     </div>
                     <button
                       onClick={(e) => {
-                        if (!hasAccount) {
-                          e.stopPropagation();
-                          return;
-                        }
                         e.stopPropagation();
-                        launchGame(instance.id);
+                        if (hasAccount) {
+                          launchGame(instance.id);
+                        } else {
+                          setOfflineDialog(instance.id);
+                        }
                       }}
-                      disabled={!hasAccount}
-                      title={!hasAccount ? "Sign in to play" : undefined}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        hasAccount
-                          ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                          : "bg-slate-700 text-slate-500 cursor-not-allowed"
-                      }`}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                     >
                       Play
                     </button>
@@ -365,6 +364,53 @@ export function Home() {
       isOpen={showImport}
       onClose={() => setShowImport(false)}
     />
+    {/* Offline username dialog */}
+    {offlineDialog && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-sm mx-4 p-6">
+          <h2 className="text-lg font-semibold text-white mb-2">Play Offline</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            Enter a username to launch in offline mode. No Microsoft account needed.
+          </p>
+          <input
+            type="text"
+            value={offlineUsername}
+            onChange={(e) => setOfflineUsername(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && offlineUsername.trim()) {
+                localStorage.setItem("offline-username", offlineUsername.trim());
+                launchGameOffline(offlineDialog, offlineUsername.trim());
+                setOfflineDialog(null);
+              }
+            }}
+            placeholder="Username"
+            autoFocus
+            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 mb-4"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setOfflineDialog(null)}
+              className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                if (offlineUsername.trim()) {
+                  localStorage.setItem("offline-username", offlineUsername.trim());
+                  launchGameOffline(offlineDialog, offlineUsername.trim());
+                  setOfflineDialog(null);
+                }
+              }}
+              disabled={!offlineUsername.trim()}
+              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Launch
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

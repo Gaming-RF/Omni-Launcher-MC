@@ -11,6 +11,7 @@ interface InstancesState {
   createInstance: (payload: tauri.CreateInstancePayload) => Promise<InstanceListItem>;
   deleteInstance: (id: string) => Promise<void>;
   launchGame: (instanceId: string) => Promise<void>;
+  launchGameOffline: (instanceId: string, username: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -57,6 +58,17 @@ export const useInstancesStore = create<InstancesState>((set, get) => ({
       await tauri.prepareInstance(instanceId);
       const pid = await tauri.launchGame(instanceId);
       console.log(`Game launched with PID ${pid}`);
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  launchGameOffline: async (instanceId: string, username: string) => {
+    set({ error: null });
+    try {
+      await tauri.prepareInstance(instanceId);
+      const pid = await tauri.launchGameOffline(instanceId, username);
+      console.log(`Game launched offline as ${username} (PID ${pid})`);
     } catch (err) {
       set({ error: String(err) });
     }

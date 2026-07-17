@@ -78,6 +78,7 @@ pub fn run() {
             // Minecraft commands
             commands::minecraft::get_version_manifest,
             commands::minecraft::launch_game,
+            commands::minecraft::launch_game_offline,
             commands::minecraft::prepare_instance,
             commands::minecraft::check_java,
             commands::minecraft::modrinth_search,

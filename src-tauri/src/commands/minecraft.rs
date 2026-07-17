@@ -163,6 +163,7 @@ pub async fn launch_game(
             &account.access_token,
             &account.username,
             &account.uuid,
+            false,
         )
         .await
         .map_err(|e| e.to_string())?;
@@ -300,4 +301,118 @@ pub async fn curseforge_search(
                 .collect(),
         })
         .collect())
+}
+
+// ── Offline Launch ──────────────────────────────────────────────
+
+/// Generate a deterministic offline UUID from a username.
+/// Matches the standard Minecraft offline UUID: MD5 of "OfflinePlayer:{name}".
+fn offline_uuid(username: &str) -> String {
+    let digest = md5::compute(format!("OfflinePlayer:{}", username).as_bytes());
+    let hex = format!("{:x}", digest);
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    )
+}
+
+/// Launch a game instance in offline mode — no Microsoft account required.
+/// Just provide a username and it launches.
+#[tauri::command]
+pub async fn launch_game_offline(
+    state: State<'_, AppState>,
+    instance_id: String,
+    username: String,
+) -> Result<u32, String> {
+    if username.trim().is_empty() {
+        return Err("Username cannot be empty".to_string());
+    }
+
+    let task_id = format!("launch-{}", instance_id);
+
+    // Emit progress: starting
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(app, &task_id, "starting", "Preparing to launch (offline)...");
+        }
+    }
+
+    let instance = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let inst = db::instances::get_instance(&db, &instance_id)
+            .map_err(|e| e.to_string())?
+            .ok_or("Instance not found")?;
+
+        db::instances::record_play(&db, &instance_id).map_err(|e| e.to_string())?;
+
+        inst
+    };
+
+    let base_dir = crate::utils::paths::data_dir();
+
+    // Auto-download Java
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(app, &task_id, "java", "Checking Java...");
+        }
+    }
+
+    let java_path = crate::utils::java::ensure_java(&instance.game_version, None)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let game_launcher = launcher::GameLauncher::new(base_dir, java_path);
+
+    // Prepare (download assets if needed)
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(app, &task_id, "assets", "Downloading game files...");
+        }
+    }
+
+    game_launcher
+        .prepare(&instance)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Launch with offline credentials
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(app, &task_id, "launching", "Starting Minecraft (offline)...");
+        }
+    }
+
+    let uuid = offline_uuid(&username);
+    let access_token = "0"; // Dummy token for offline mode
+
+    let (pid, child) = game_launcher
+        .launch(&instance, access_token, &username, &uuid, true)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Register with process manager
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            state.process_manager.spawn(app, &instance_id, child, pid);
+        }
+    }
+
+    // Emit completion
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::complete(app, &task_id, &format!("Minecraft launched as {} (PID {})", username, pid));
+        }
+    }
+
+    Ok(pid)
 }
