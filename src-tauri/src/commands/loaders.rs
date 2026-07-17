@@ -1,3 +1,4 @@
+use crate::api::curseforge;
 use crate::api::loaders;
 use crate::api::minecraft;
 use crate::api::modrinth;
@@ -456,4 +457,205 @@ pub async fn install_mrpack_modpack(
         play_time_secs: instance.play_time_secs,
         allocated_memory_mb: instance.allocated_memory_mb,
     })
+}
+
+// ── CurseForge Mod Install ──────────────────────────────────────
+
+/// Install a mod from CurseForge into an instance's mods/ directory.
+#[tauri::command]
+pub async fn install_mod_from_curseforge(
+    state: State<'_, AppState>,
+    instance_id: String,
+    mod_id: String,
+    game_version: String,
+    loader: String,
+) -> Result<InstalledModInfo, String> {
+    let api_key = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::settings::get_curseforge_api_key(&db)
+            .map_err(|e| e.to_string())?
+            .ok_or("CurseForge API key not configured")?
+    };
+
+    let cf_mod_id: i32 = mod_id.parse().map_err(|_| "Invalid CurseForge mod ID")?;
+
+    // Check if already installed
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        if db::mods::is_mod_installed(&db, &instance_id, &mod_id, "curseforge")
+            .map_err(|e| e.to_string())?
+        {
+            return Err("Mod is already installed".to_string());
+        }
+    }
+
+    // Get compatible files
+    let files = curseforge::get_mod_files(
+        &api_key,
+        cf_mod_id,
+        Some(&game_version),
+        Some(&loader),
+        0,
+        10,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let file = files
+        .iter()
+        .find(|f| f.is_available && f.download_url.is_some())
+        .ok_or("No compatible file found for this MC version and loader")?;
+
+    let download_url = file
+        .download_url
+        .as_ref()
+        .ok_or("Download URL not available (author disabled third-party downloads)")?;
+
+    // Download the mod JAR
+    let mods_dir = crate::utils::paths::instances_dir()
+        .join(&instance_id)
+        .join("mods");
+    std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+
+    let dest = mods_dir.join(&file.file_name);
+    minecraft::download_file(download_url, &dest)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Get mod name
+    let mod_info = curseforge::get_mod(&api_key, cf_mod_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Record in database
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db::mods::record_mod_install(
+        &db,
+        &instance_id,
+        &mod_id,
+        "curseforge",
+        &mod_info.name,
+        file.display_name.as_deref().unwrap_or(&file.file_name),
+        &file.file_name,
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(InstalledModInfo {
+        id: 0,
+        mod_id,
+        source: "curseforge".to_string(),
+        name: mod_info.name,
+        version: file.display_name.clone().unwrap_or_else(|| file.file_name.clone()),
+        file_name: file.file_name.clone(),
+        enabled: true,
+        installed_at: chrono::Utc::now().to_rfc3339(),
+    })
+}
+
+// ── Unified Mod Install ─────────────────────────────────────────
+
+/// Unified install: routes to Modrinth or CurseForge based on source.
+/// Also attempts to install required dependencies.
+#[tauri::command]
+pub async fn install_mod(
+    state: State<'_, AppState>,
+    instance_id: String,
+    source: String,
+    project_id: String,
+    game_version: String,
+    loader: String,
+) -> Result<InstalledModInfo, String> {
+    match source.as_str() {
+        "modrinth" => {
+            install_mod_from_modrinth(state, instance_id, project_id, game_version, loader).await
+        }
+        "curseforge" => {
+            install_mod_from_curseforge(state, instance_id, project_id, game_version, loader).await
+        }
+        _ => Err(format!("Unknown mod source: {}", source)),
+    }
+}
+
+// ── Cross-Source Version Listing ────────────────────────────────
+
+/// Get available versions for a Modrinth project (for the version picker).
+#[tauri::command]
+pub async fn get_modrinth_versions(
+    project_id: String,
+    game_version: String,
+    loader: String,
+) -> Result<Vec<ModVersionInfo>, String> {
+    let versions = modrinth::get_project_versions(
+        &project_id,
+        Some(&loader),
+        Some(&game_version),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(versions
+        .into_iter()
+        .map(|v| ModVersionInfo {
+            version_id: v.id,
+            name: v.name,
+            version_number: v.version_number,
+            date_published: v.date_published,
+            download_count: v.downloads as i64,
+            file_name: v.files.first().map(|f| f.filename.clone()),
+            file_url: v.files.first().map(|f| f.url.clone()),
+        })
+        .collect())
+}
+
+/// Get available versions for a CurseForge mod (for the version picker).
+#[tauri::command]
+pub async fn get_curseforge_versions(
+    state: State<'_, AppState>,
+    mod_id: String,
+    game_version: String,
+    loader: String,
+) -> Result<Vec<ModVersionInfo>, String> {
+    let api_key = {
+        let db_lock = state.db.lock().map_err(|e| e.to_string())?;
+        db::settings::get_curseforge_api_key(&db_lock)
+            .map_err(|e| e.to_string())?
+            .ok_or("CurseForge API key not configured")?
+    };
+
+    let cf_mod_id: i32 = mod_id.parse().map_err(|_| "Invalid CurseForge mod ID")?;
+
+    let files = curseforge::get_mod_files(
+        &api_key,
+        cf_mod_id,
+        Some(&game_version),
+        Some(&loader),
+        0,
+        20,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(files
+        .into_iter()
+        .map(|f| ModVersionInfo {
+            version_id: f.id.to_string(),
+            name: f.display_name.unwrap_or_else(|| f.file_name.clone()),
+            version_number: f.file_name.clone(),
+            date_published: f.file_date,
+            download_count: f.download_count,
+            file_name: Some(f.file_name),
+            file_url: f.download_url,
+        })
+        .collect())
+}
+
+#[derive(Serialize)]
+pub struct ModVersionInfo {
+    pub version_id: String,
+    pub name: String,
+    pub version_number: String,
+    pub date_published: String,
+    pub download_count: i64,
+    pub file_name: Option<String>,
+    pub file_url: Option<String>,
 }

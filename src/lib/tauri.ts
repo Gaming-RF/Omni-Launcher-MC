@@ -258,6 +258,63 @@ export async function installModFromModrinth(
   });
 }
 
+export async function installModFromCurseforge(
+  instanceId: string,
+  modId: string,
+  gameVersion: string,
+  loader: string
+): Promise<InstalledModInfo> {
+  return invoke("install_mod_from_curseforge", {
+    instanceId,
+    modId,
+    gameVersion,
+    loader,
+  });
+}
+
+/** Unified install — routes to Modrinth or CurseForge based on source. */
+export async function installMod(
+  instanceId: string,
+  source: string,
+  projectId: string,
+  gameVersion: string,
+  loader: string
+): Promise<InstalledModInfo> {
+  return invoke("install_mod", {
+    instanceId,
+    source,
+    projectId,
+    gameVersion,
+    loader,
+  });
+}
+
+export interface ModVersionInfo {
+  version_id: string;
+  name: string;
+  version_number: string;
+  date_published: string;
+  download_count: number;
+  file_name: string | null;
+  file_url: string | null;
+}
+
+export async function getModrinthVersions(
+  projectId: string,
+  gameVersion: string,
+  loader: string
+): Promise<ModVersionInfo[]> {
+  return invoke("get_modrinth_versions", { projectId, gameVersion, loader });
+}
+
+export async function getCurseforgeVersions(
+  modId: string,
+  gameVersion: string,
+  loader: string
+): Promise<ModVersionInfo[]> {
+  return invoke("get_curseforge_versions", { modId, gameVersion, loader });
+}
+
 export async function toggleModEnabled(
   modId: number,
   instanceId: string

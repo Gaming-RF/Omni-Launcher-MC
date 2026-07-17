@@ -1,9 +1,24 @@
-import { useState, useCallback } from "react";
-import { Search, Download, Loader2, Globe, Package } from "lucide-react";
-import type { ModSearchResult } from "../lib/tauri";
-import { modrinthSearch, curseforgeSearch } from "../lib/tauri";
+import { useState, useCallback, useEffect } from "react";
+import {
+  Search,
+  Download,
+  Loader2,
+  Globe,
+  Package,
+  X,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
+import type { ModSearchResult, InstanceListItem } from "../lib/tauri";
+import { modrinthSearch, curseforgeSearch, getInstances, installMod } from "../lib/tauri";
 
 type Source = "modrinth" | "curseforge" | "all";
+
+interface InstallState {
+  mod: ModSearchResult;
+  status: "picking" | "installing" | "done" | "error";
+  message?: string;
+}
 
 export function Discover() {
   const [query, setQuery] = useState("");
@@ -12,6 +27,13 @@ export function Discover() {
   const [source, setSource] = useState<Source>("all");
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [instances, setInstances] = useState<InstanceListItem[]>([]);
+  const [installState, setInstallState] = useState<InstallState | null>(null);
+
+  // Load instances on mount
+  useEffect(() => {
+    getInstances().then(setInstances).catch(console.error);
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -54,6 +76,33 @@ export function Discover() {
     }
   }, [query, source]);
 
+  const handleInstallClick = (mod: ModSearchResult) => {
+    setInstallState({ mod, status: "picking" });
+  };
+
+  const handleInstallToInstance = async (instance: InstanceListItem) => {
+    if (!installState) return;
+    const { mod } = installState;
+    setInstallState({ mod, status: "installing" });
+
+    try {
+      const loader = instance.loader || "vanilla";
+      await installMod(instance.id, mod.source, mod.project_id, instance.game_version, loader);
+      setInstallState({
+        mod,
+        status: "done",
+        message: `Installed ${mod.title} to ${instance.name}`,
+      });
+      setTimeout(() => setInstallState(null), 3000);
+    } catch (err) {
+      setInstallState({
+        mod,
+        status: "error",
+        message: String(err),
+      });
+    }
+  };
+
   const formatDownloads = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -79,7 +128,9 @@ export function Discover() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Discover Mods</h1>
-        <p className="text-slate-400 mt-1">Search across Modrinth and CurseForge</p>
+        <p className="text-slate-400 mt-1">
+          Search and install from Modrinth &amp; CurseForge — all in one place
+        </p>
       </div>
 
       <div className="flex gap-2">
@@ -156,9 +207,7 @@ export function Discover() {
                     <h3 className="text-white font-semibold">{mod.title}</h3>
                     {sourceBadge(mod.source)}
                   </div>
-                  <p className="text-sm text-slate-400 mt-1 line-clamp-2">
-                    {mod.description}
-                  </p>
+                  <p className="text-sm text-slate-400 mt-1 line-clamp-2">{mod.description}</p>
                   <div className="flex items-center gap-4 mt-2">
                     <span className="flex items-center gap-1 text-xs text-slate-500">
                       <Download size={12} />
@@ -178,9 +227,94 @@ export function Discover() {
                     )}
                   </div>
                 </div>
+
+                <button
+                  onClick={() => handleInstallClick(mod)}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shrink-0"
+                >
+                  <Download size={14} />
+                  Install
+                </button>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Instance picker modal */}
+      {installState && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4 p-6">
+            {installState.status === "picking" && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">
+                    Install {installState.mod.title}
+                  </h2>
+                  <button
+                    onClick={() => setInstallState(null)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <p className="text-sm text-slate-400 mb-4">
+                  Choose an instance to install to:
+                </p>
+                {instances.length === 0 ? (
+                  <p className="text-slate-500 text-sm">
+                    No instances found. Create one first.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {instances.map((inst) => (
+                      <button
+                        key={inst.id}
+                        onClick={() => handleInstallToInstance(inst)}
+                        className="w-full text-left bg-slate-700 hover:bg-slate-600 rounded-lg p-3 transition-colors"
+                      >
+                        <div className="font-medium text-white">{inst.name}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          MC {inst.game_version} · {inst.loader || "vanilla"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {installState.status === "installing" && (
+              <div className="flex flex-col items-center py-8">
+                <Loader2 size={32} className="animate-spin text-blue-400 mb-4" />
+                <p className="text-white font-medium">Installing {installState.mod.title}...</p>
+                <p className="text-sm text-slate-400 mt-1">Downloading from {installState.mod.source}</p>
+              </div>
+            )}
+
+            {installState.status === "done" && (
+              <div className="flex flex-col items-center py-8">
+                <CheckCircle size={32} className="text-green-400 mb-4" />
+                <p className="text-white font-medium">{installState.message}</p>
+              </div>
+            )}
+
+            {installState.status === "error" && (
+              <div className="flex flex-col items-center py-8">
+                <AlertCircle size={32} className="text-red-400 mb-4" />
+                <p className="text-white font-medium">Install failed</p>
+                <p className="text-sm text-red-400 mt-1 text-center max-w-xs">
+                  {installState.message}
+                </p>
+                <button
+                  onClick={() => setInstallState(null)}
+                  className="mt-4 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

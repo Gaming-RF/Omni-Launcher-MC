@@ -97,8 +97,12 @@ pub fn run() {
             // Mod management commands
             commands::loaders::get_instance_mods,
             commands::loaders::install_mod_from_modrinth,
+            commands::loaders::install_mod_from_curseforge,
+            commands::loaders::install_mod,
             commands::loaders::toggle_mod_enabled,
             commands::loaders::remove_mod,
+            commands::loaders::get_modrinth_versions,
+            commands::loaders::get_curseforge_versions,
             // Modpack import commands
             commands::loaders::parse_mrpack_file,
             commands::loaders::parse_cf_modpack_file,

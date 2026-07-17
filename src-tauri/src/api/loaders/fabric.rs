@@ -22,6 +22,13 @@ pub struct FabricLoaderVersion {
     pub stable: bool,
 }
 
+/// Each entry from the Fabric meta API wraps loader + intermediary info.
+#[derive(Debug, Deserialize)]
+struct FabricVersionEntry {
+    loader: FabricLoaderVersion,
+    // intermediary and launcherMeta are present but not needed for listing
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FabricGameVersion {
     pub version: String,
@@ -33,7 +40,7 @@ pub async fn get_loader_versions(mc_version: &str) -> Result<Vec<FabricLoaderVer
     let client = reqwest::Client::new();
     let url = format!("{}/versions/loader/{}", META_BASE, mc_version);
 
-    let versions: Vec<FabricLoaderVersion> = client
+    let entries: Vec<FabricVersionEntry> = client
         .get(&url)
         .header("User-Agent", USER_AGENT)
         .send()
@@ -43,7 +50,7 @@ pub async fn get_loader_versions(mc_version: &str) -> Result<Vec<FabricLoaderVer
         .await
         .context("Failed to parse Fabric loader versions")?;
 
-    Ok(versions)
+    Ok(entries.into_iter().map(|e| e.loader).collect())
 }
 
 /// Get the latest stable Fabric loader version for a Minecraft version.
