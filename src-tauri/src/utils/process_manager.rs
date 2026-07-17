@@ -49,6 +49,12 @@ pub struct ProcessManager {
 
 const MAX_LOG_LINES: usize = 5000;
 
+impl Default for ProcessManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessManager {
     pub fn new() -> Self {
         Self {
