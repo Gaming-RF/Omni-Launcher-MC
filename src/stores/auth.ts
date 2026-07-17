@@ -1,46 +1,51 @@
 import { create } from "zustand";
-import type { Account } from "../lib/tauri";
-import { listAccounts } from "../lib/tauri";
+import type { AccountInfo } from "../lib/tauri";
+import * as tauri from "../lib/tauri";
 
 interface AuthState {
-  accounts: Account[];
-  activeAccount: Account | null;
-  isLoading: boolean;
-  loginDeviceCode: string | null;
-  loginUrl: string | null;
+  accounts: AccountInfo[];
+  activeAccount: AccountInfo | null;
+  loading: boolean;
+  error: string | null;
 
   fetchAccounts: () => Promise<void>;
-  setActiveAccount: (account: Account | null) => void;
-  setLoginPending: (userCode: string, url: string) => void;
-  clearLoginPending: () => void;
+  removeAccount: (uuid: string) => Promise<void>;
+  clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   accounts: [],
   activeAccount: null,
-  isLoading: false,
-  loginDeviceCode: null,
-  loginUrl: null,
+  loading: false,
+  error: null,
 
   fetchAccounts: async () => {
-    set({ isLoading: true });
+    set({ loading: true, error: null });
     try {
-      const accounts = await listAccounts();
+      const accounts = await tauri.getAccounts();
       set({
         accounts,
         activeAccount: accounts[0] ?? null,
-        isLoading: false,
+        loading: false,
       });
-    } catch {
-      set({ isLoading: false });
+    } catch (err) {
+      set({ error: String(err), loading: false });
     }
   },
 
-  setActiveAccount: (account) => set({ activeAccount: account }),
+  removeAccount: async (uuid: string) => {
+    try {
+      await tauri.removeAccount(uuid);
+      const { accounts } = get();
+      const remaining = accounts.filter((a) => a.uuid !== uuid);
+      set({
+        accounts: remaining,
+        activeAccount: remaining[0] ?? null,
+      });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
 
-  setLoginPending: (userCode, url) =>
-    set({ loginDeviceCode: userCode, loginUrl: url }),
-
-  clearLoginPending: () =>
-    set({ loginDeviceCode: null, loginUrl: null }),
+  clearError: () => set({ error: null }),
 }));

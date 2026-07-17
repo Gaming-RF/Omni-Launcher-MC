@@ -1,95 +1,107 @@
-use serde::{Deserialize, Serialize};
-use tauri::command;
+use crate::api::auth;
+use crate::db;
+use crate::AppState;
+use serde::Serialize;
+use tauri::State;
 
-/// Response from Microsoft Device Code flow initiation
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DeviceCodeResponse {
-    pub device_code: String,
+#[derive(Serialize)]
+pub struct DeviceCodeInfo {
     pub user_code: String,
     pub verification_uri: String,
-    pub expires_in: u32,
-    pub interval: u32,
     pub message: String,
 }
 
-/// Minecraft profile returned after successful auth
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MinecraftProfile {
-    pub id: String,
-    pub name: String,
-    pub skins: Vec<Skin>,
-    pub capes: Vec<Cape>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Skin {
-    pub id: String,
-    pub state: String,
-    pub url: String,
-    pub variant: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Cape {
-    pub id: String,
-    pub state: String,
-    pub url: String,
-}
-
-/// Stored account info
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Account {
+#[derive(Serialize)]
+pub struct AccountInfo {
     pub uuid: String,
     pub username: String,
-    pub access_token: String,
-    pub refresh_token: String,
     pub skin_url: Option<String>,
 }
 
-/// Starts Microsoft Device Code authentication flow.
-/// Returns the device code + user code for the user to enter.
-#[command]
-pub async fn login_start() -> Result<DeviceCodeResponse, String> {
-    // TODO: Implement Microsoft OAuth2 Device Code flow
-    // 1. POST https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode
-    //    client_id=<MSA_CLIENT_ID>&scope=XboxLive.signin%20offline_access
-    // 2. Return device_code, user_code, verification_uri, message
-    Err("Not yet implemented".to_string())
+#[tauri::command]
+pub async fn start_login(state: State<'_, AppState>) -> Result<DeviceCodeInfo, String> {
+    let device_code = auth::start_device_code_flow()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Store device_code temporarily in settings for polling
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db::settings::set_setting(&db, "_device_code", &device_code.device_code)
+        .map_err(|e| e.to_string())?;
+
+    Ok(DeviceCodeInfo {
+        user_code: device_code.user_code,
+        verification_uri: device_code.verification_uri,
+        message: device_code.message,
+    })
 }
 
-/// Polls the Microsoft token endpoint until the user completes auth.
-/// On success, chains through Xbox Live -> XSTS -> Minecraft auth.
-#[command]
-pub async fn login_poll(device_code: String) -> Result<Account, String> {
-    // TODO: Implement token polling and auth chain
-    // 1. Poll POST https://login.microsoftonline.com/consumers/oauth2/v2.0/token
-    //    until user completes auth (handle "authorization_pending" gracefully)
-    // 2. Xbox Live: POST https://user.auth.xboxlive.com/user/authenticate
-    // 3. XSTS: POST https://xsts.auth.xboxlive.com/xsts/authorize
-    // 4. MC auth: POST https://api.minecraftservices.com/authentication/login_with_xbox
-    // 5. Profile: GET https://api.minecraftservices.com/minecraft/profile
-    // 6. Store account in DB
-    Err("Not yet implemented".to_string())
+#[tauri::command]
+pub async fn poll_login(state: State<'_, AppState>) -> Result<AccountInfo, String> {
+    // Get stored device code
+    let device_code = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::settings::get_setting(&db, "_device_code")
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "No login in progress".to_string())?
+    };
+
+    // Poll Microsoft for tokens
+    let (msa_token, _refresh) = auth::poll_for_token(&device_code)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Xbox auth chain
+    let (mc_token, _xuid) = auth::xbox_auth_chain(&msa_token)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Get Minecraft profile
+    let profile = auth::get_minecraft_profile(&mc_token)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let skin_url = profile.skins.first().map(|s| s.url.clone());
+
+    // Save to database
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let account = db::accounts::Account {
+        uuid: profile.id.clone(),
+        username: profile.name.clone(),
+        access_token: mc_token,
+        refresh_token: String::new(), // TODO: Store MSA refresh token
+        skin_url,
+    };
+    db::accounts::upsert_account(&db, &account).map_err(|e| e.to_string())?;
+
+    // Clean up device code
+    let _ = db::settings::delete_setting(&db, "_device_code");
+
+    Ok(AccountInfo {
+        uuid: account.uuid,
+        username: account.username,
+        skin_url: account.skin_url,
+    })
 }
 
-/// Returns the current Minecraft profile for the active account.
-#[command]
-pub async fn get_profile() -> Result<MinecraftProfile, String> {
-    // TODO: Fetch from https://api.minecraftservices.com/minecraft/profile
-    // using stored access token
-    Err("Not yet implemented".to_string())
+#[tauri::command]
+pub fn get_accounts(state: State<'_, AppState>) -> Result<Vec<AccountInfo>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let accounts = db::accounts::get_all_accounts(&db).map_err(|e| e.to_string())?;
+
+    Ok(accounts
+        .into_iter()
+        .map(|a| AccountInfo {
+            uuid: a.uuid,
+            username: a.username,
+            skin_url: a.skin_url,
+        })
+        .collect())
 }
 
-/// Logs out the active account, removing stored tokens.
-#[command]
-pub async fn logout(uuid: String) -> Result<(), String> {
-    // TODO: Remove account from DB, clear stored tokens
-    Err("Not yet implemented".to_string())
-}
-
-/// Lists all stored accounts.
-#[command]
-pub async fn list_accounts() -> Result<Vec<Account>, String> {
-    // TODO: Query accounts from DB
-    Err("Not yet implemented".to_string())
+#[tauri::command]
+pub fn remove_account(state: State<'_, AppState>, uuid: String) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db::accounts::delete_account(&db, &uuid).map_err(|e| e.to_string())?;
+    Ok(())
 }

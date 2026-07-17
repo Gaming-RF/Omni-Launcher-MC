@@ -1,185 +1,227 @@
-import { useState } from "react";
-import PageContainer from "../components/layout/PageContainer";
-import Button from "../components/common/Button";
+import { useState, useEffect } from "react";
 import { useSettingsStore } from "../stores/settings";
+import { startLogin, pollLogin } from "../lib/tauri";
 import { useAuthStore } from "../stores/auth";
-import { User, LogOut } from "lucide-react";
-import { loginStart, loginPoll } from "../lib/tauri";
+import {
+  User,
+  Key,
+  Monitor,
+  Cpu,
+  ExternalLink,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 
-export default function Settings() {
-  const settings = useSettingsStore();
-  const auth = useAuthStore();
-  const [loginPending, setLoginPending] = useState(false);
-  const [deviceCode, setDeviceCode] = useState<string | null>(null);
+export function Settings() {
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSetting = useSettingsStore((s) => s.updateSetting);
+  const activeAccount = useAuthStore((s) => s.activeAccount);
+  const fetchAccounts = useAuthStore((s) => s.fetchAccounts);
+
   const [userCode, setUserCode] = useState<string | null>(null);
+  const [verificationUri, setVerificationUri] = useState<string | null>(null);
+  const [loginStatus, setLoginStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleLogin = async () => {
+    setLoginStatus("pending");
     setLoginError(null);
-    setLoginPending(true);
     try {
-      const response = await loginStart();
-      setDeviceCode(response.device_code);
+      const response = await startLogin();
       setUserCode(response.user_code);
-      // Open verification URL in browser
-      window.open(response.verification_uri, "_blank");
+      setVerificationUri(response.verification_uri);
 
-      // Poll for completion
+      // Start polling
       const poll = async () => {
         try {
-          await loginPoll(response.device_code);
-          auth.fetchAccounts();
-          setDeviceCode(null);
+          await pollLogin();
+          fetchAccounts();
+          setLoginStatus("success");
           setUserCode(null);
-          setLoginPending(false);
+          setVerificationUri(null);
         } catch (err) {
-          // Keep polling if authorization_pending
-          setTimeout(poll, response.interval * 1000);
+          const msg = String(err);
+          if (msg.includes("authorization_pending") || msg.includes("slow_down")) {
+            setTimeout(poll, 5000);
+          } else {
+            setLoginStatus("error");
+            setLoginError(msg);
+          }
         }
       };
-      setTimeout(poll, response.interval * 1000);
+      setTimeout(poll, 5000);
     } catch (err) {
+      setLoginStatus("error");
       setLoginError(String(err));
-      setLoginPending(false);
     }
   };
 
+  const [javaPath, setJavaPath] = useState(settings?.java_path ?? "");
+  const [cfKey, setCfKey] = useState(settings?.curseforge_api_key ?? "");
+  const [memory, setMemory] = useState(settings?.default_memory_mb ?? "4096");
+
+  useEffect(() => {
+    if (settings) {
+      setJavaPath(settings.java_path ?? "");
+      setCfKey(settings.curseforge_api_key ?? "");
+      setMemory(settings.default_memory_mb);
+    }
+  }, [settings]);
+
   return (
-    <PageContainer title="Settings">
-      <div className="space-y-8">
-        {/* Account Section */}
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Account</h2>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            {auth.activeAccount ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={`https://mc-heads.net/avatar/${auth.activeAccount.uuid}/64`}
-                    alt=""
-                    className="h-12 w-12 rounded-lg"
-                  />
-                  <div>
-                    <p className="font-semibold">
-                      {auth.activeAccount.username}
-                    </p>
-                    <p className="text-xs text-zinc-500">
-                      UUID: {auth.activeAccount.uuid}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm">
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Button>
-              </div>
-            ) : deviceCode ? (
-              <div className="text-center">
-                <p className="mb-2 text-sm text-zinc-400">
-                  Enter this code at Microsoft:
-                </p>
-                <p className="mb-4 text-3xl font-bold tracking-widest text-white">
-                  {userCode}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  Waiting for authentication...
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-zinc-400">
-                  <User className="h-8 w-8" />
-                  <div>
-                    <p className="font-medium text-zinc-200">
-                      Not signed in
-                    </p>
-                    <p className="text-xs">
-                      Sign in with your Microsoft account to play
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleLogin}
-                  disabled={loginPending}
-                >
-                  Sign in with Microsoft
-                </Button>
-              </div>
-            )}
-            {loginError && (
-              <p className="mt-3 text-sm text-red-400">{loginError}</p>
-            )}
-          </div>
-        </section>
+    <div className="max-w-2xl space-y-8">
+      <h1 className="text-2xl font-bold text-white">Settings</h1>
 
-        {/* Java Section */}
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Java</h2>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-                Java Path
-              </label>
-              <input
-                type="text"
-                value={settings.javaPath ?? "Auto-detect"}
-                readOnly
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-400"
-              />
+      {/* Account Section */}
+      <section className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <User size={20} />
+          Account
+        </h2>
+
+        {activeAccount && (
+          <div className="flex items-center gap-3 bg-slate-900 rounded-lg p-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+              {activeAccount.username.charAt(0)}
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-                Max Memory: {settings.maxMemoryMb} MB
-              </label>
-              <input
-                type="range"
-                min={1024}
-                max={16384}
-                step={512}
-                value={settings.maxMemoryMb}
-                onChange={(e) =>
-                  settings.setMaxMemoryMb(Number(e.target.value))
-                }
-                className="w-full accent-green-500"
-              />
-              <div className="flex justify-between text-xs text-zinc-500">
-                <span>1 GB</span>
-                <span>16 GB</span>
-              </div>
+              <p className="text-white font-medium">{activeAccount.username}</p>
+              <p className="text-xs text-slate-400 font-mono">{activeAccount.uuid}</p>
             </div>
+            <CheckCircle size={16} className="ml-auto text-emerald-400" />
           </div>
-        </section>
+        )}
 
-        {/* CurseForge API Key */}
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">API Keys</h2>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              CurseForge API Key
-            </label>
-            <p className="mb-3 text-xs text-zinc-500">
-              Required to browse CurseForge mods. Get your key at{" "}
-              <a
-                href="https://console.curseforge.com"
-                target="_blank"
-                rel="noreferrer"
-                className="text-green-400 underline"
-              >
-                console.curseforge.com
-              </a>
+        {loginStatus === "pending" && userCode ? (
+          <div className="bg-slate-900 rounded-lg p-4 space-y-3">
+            <p className="text-slate-300 text-sm">Enter this code in your browser:</p>
+            <p className="text-2xl font-mono font-bold text-white tracking-wider bg-slate-800 px-4 py-2 rounded text-center">
+              {userCode}
             </p>
-            <input
-              type="password"
-              value={settings.curseforgeApiKey ?? ""}
-              onChange={(e) =>
-                settings.setCurseforgeApiKey(e.target.value || null)
-              }
-              placeholder="Enter your API key"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-green-500 focus:outline-none"
-            />
+            <a
+              href={verificationUri ?? "https://www.microsoft.com/link"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
+            >
+              <ExternalLink size={14} />
+              {verificationUri}
+            </a>
+            <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <Loader2 size={14} className="animate-spin" />
+              Waiting for you to authorize...
+            </div>
           </div>
-        </section>
-      </div>
-    </PageContainer>
+        ) : (
+          <div className="space-y-2">
+            <button
+              onClick={handleLogin}
+              disabled={loginStatus === "pending"}
+              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              {activeAccount ? "Add Another Account" : "Sign in with Microsoft"}
+            </button>
+            {loginStatus === "success" && (
+              <p className="text-emerald-400 text-sm flex items-center gap-1">
+                <CheckCircle size={14} /> Signed in successfully!
+              </p>
+            )}
+            {loginStatus === "error" && (
+              <p className="text-red-400 text-sm flex items-center gap-1">
+                <AlertCircle size={14} /> {loginError}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Java Section */}
+      <section className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Cpu size={20} />
+          Java
+        </h2>
+        <label className="block text-sm text-slate-300 mb-1">
+          Java Executable Path
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={javaPath}
+            onChange={(e) => setJavaPath(e.target.value)}
+            placeholder="Auto-detect (leave empty)"
+            className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={() => updateSetting("java_path", javaPath)}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            Save
+          </button>
+        </div>
+      </section>
+
+      {/* Memory Section */}
+      <section className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Monitor size={20} />
+          Performance
+        </h2>
+        <label className="block text-sm text-slate-300 mb-1">
+          Default Allocated Memory (MB)
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            min={512}
+            max={16384}
+            step={512}
+            value={memory}
+            onChange={(e) => setMemory(e.target.value)}
+            className="w-32 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={() => updateSetting("default_memory_mb", memory)}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            Save
+          </button>
+        </div>
+      </section>
+
+      {/* CurseForge API Key */}
+      <section className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Key size={20} />
+          CurseForge API Key
+        </h2>
+        <p className="text-sm text-slate-400 mb-3">
+          Required for CurseForge mod browsing. Get a free key at{" "}
+          <a
+            href="https://console.curseforge.com/"
+            target="_blank"
+            className="text-blue-400 hover:underline"
+          >
+            console.curseforge.com
+          </a>
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="password"
+            value={cfKey}
+            onChange={(e) => setCfKey(e.target.value)}
+            placeholder="$2a$..."
+            className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          />
+          <button
+            onClick={() => updateSetting("curseforge_api_key", cfKey)}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            Save
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }

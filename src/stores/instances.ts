@@ -1,30 +1,66 @@
 import { create } from "zustand";
-import type { Instance } from "../lib/tauri";
-import { listInstances } from "../lib/tauri";
+import type { InstanceListItem } from "../lib/tauri";
+import * as tauri from "../lib/tauri";
 
 interface InstancesState {
-  instances: Instance[];
-  isLoading: boolean;
-  selectedInstance: Instance | null;
+  instances: InstanceListItem[];
+  loading: boolean;
+  error: string | null;
 
   fetchInstances: () => Promise<void>;
-  selectInstance: (instance: Instance | null) => void;
+  createInstance: (payload: tauri.CreateInstancePayload) => Promise<InstanceListItem>;
+  deleteInstance: (id: string) => Promise<void>;
+  launchGame: (instanceId: string) => Promise<void>;
+  clearError: () => void;
 }
 
-export const useInstancesStore = create<InstancesState>((set) => ({
+export const useInstancesStore = create<InstancesState>((set, get) => ({
   instances: [],
-  isLoading: false,
-  selectedInstance: null,
+  loading: false,
+  error: null,
 
   fetchInstances: async () => {
-    set({ isLoading: true });
+    set({ loading: true, error: null });
     try {
-      const instances = await listInstances();
-      set({ instances, isLoading: false });
-    } catch {
-      set({ isLoading: false });
+      const instances = await tauri.getInstances();
+      set({ instances, loading: false });
+    } catch (err) {
+      set({ error: String(err), loading: false });
     }
   },
 
-  selectInstance: (instance) => set({ selectedInstance: instance }),
+  createInstance: async (payload) => {
+    set({ error: null });
+    try {
+      const instance = await tauri.createInstance(payload);
+      set({ instances: [instance, ...get().instances] });
+      return instance;
+    } catch (err) {
+      set({ error: String(err) });
+      throw err;
+    }
+  },
+
+  deleteInstance: async (id: string) => {
+    try {
+      await tauri.deleteInstance(id);
+      set({ instances: get().instances.filter((i) => i.id !== id) });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  launchGame: async (instanceId: string) => {
+    set({ error: null });
+    try {
+      // Prepare (download assets etc.) then launch
+      await tauri.prepareInstance(instanceId);
+      const pid = await tauri.launchGame(instanceId);
+      console.log(`Game launched with PID ${pid}`);
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  clearError: () => set({ error: null }),
 }));

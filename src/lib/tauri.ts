@@ -1,112 +1,169 @@
 import { invoke } from "@tauri-apps/api/core";
 
-// Type-safe wrapper around Tauri invoke for all backend commands.
-// Each function maps to a #[tauri::command] in the Rust backend.
-
 // ── Auth ──────────────────────────────────────────────────────
-export interface DeviceCodeResponse {
-  device_code: string;
+
+export interface DeviceCodeInfo {
   user_code: string;
   verification_uri: string;
-  expires_in: number;
-  interval: number;
   message: string;
 }
 
-export interface Account {
+export interface AccountInfo {
   uuid: string;
   username: string;
-  access_token: string;
-  refresh_token: string;
   skin_url: string | null;
 }
 
-export async function loginStart(): Promise<DeviceCodeResponse> {
-  return invoke("login_start");
+export async function startLogin(): Promise<DeviceCodeInfo> {
+  return invoke("start_login");
 }
 
-export async function loginPoll(deviceCode: string): Promise<Account> {
-  return invoke("login_poll", { deviceCode });
+export async function pollLogin(): Promise<AccountInfo> {
+  return invoke("poll_login");
 }
 
-export async function getProfile() {
-  return invoke("get_profile");
+export async function getAccounts(): Promise<AccountInfo[]> {
+  return invoke("get_accounts");
 }
 
-export async function logout(uuid: string) {
-  return invoke("logout", { uuid });
-}
-
-export async function listAccounts(): Promise<Account[]> {
-  return invoke("list_accounts");
+export async function removeAccount(uuid: string): Promise<void> {
+  return invoke("remove_account", { uuid });
 }
 
 // ── Instances ─────────────────────────────────────────────────
-export interface Instance {
+
+export interface InstanceListItem {
   id: string;
   name: string;
   game_version: string;
-  mod_loader: string | null;
-  mod_loader_version: string | null;
+  loader: string;
+  loader_version: string | null;
   icon: string | null;
-  created_at: number;
-  last_played: number | null;
-  play_time_seconds: number;
-  source: string | null;
-  source_id: string | null;
+  created_at: string;
+  last_played: string | null;
+  play_time_secs: number;
+  allocated_memory_mb: number;
 }
 
-export interface CreateInstanceParams {
+export interface CreateInstancePayload {
   name: string;
   game_version: string;
-  mod_loader?: string;
-  mod_loader_version?: string;
-  icon?: string;
+  loader: string;
+  loader_version: string | null;
+  icon: string | null;
+  java_args: string | null;
+  allocated_memory_mb: number;
 }
 
-export async function listInstances(): Promise<Instance[]> {
-  return invoke("list_instances");
+export async function getInstances(): Promise<InstanceListItem[]> {
+  return invoke("get_instances");
 }
 
 export async function createInstance(
-  params: CreateInstanceParams,
-): Promise<Instance> {
-  return invoke("create_instance", { params });
+  payload: CreateInstancePayload
+): Promise<InstanceListItem> {
+  return invoke("create_instance", { payload });
 }
 
-export async function deleteInstance(id: string) {
+export async function deleteInstance(id: string): Promise<void> {
   return invoke("delete_instance", { id });
 }
 
-export async function updateInstance(id: string, name?: string, icon?: string) {
-  return invoke("update_instance", { id, name, icon });
+export async function updateInstance(
+  id: string,
+  name?: string,
+  javaArgs?: string,
+  allocatedMemoryMb?: number
+): Promise<void> {
+  return invoke("update_instance", {
+    id,
+    name: name ?? null,
+    javaArgs: javaArgs ?? null,
+    allocatedMemoryMb: allocatedMemoryMb ?? null,
+  });
 }
 
 // ── Minecraft ─────────────────────────────────────────────────
-export interface VersionManifestEntry {
+
+export interface VersionEntry {
   id: string;
-  type: string;
-  url: string;
-  time: string;
-  releaseTime: string;
+  version_type: string;
+  release_time: string;
 }
 
-export interface VersionManifest {
-  latest: { release: string; snapshot: string };
-  versions: VersionManifestEntry[];
+export interface JavaInfo {
+  found: boolean;
+  path: string | null;
+  error: string | null;
 }
 
-export async function getVersionManifest(): Promise<VersionManifest> {
+export async function getVersionManifest(): Promise<VersionEntry[]> {
   return invoke("get_version_manifest");
 }
 
-export async function getVersionDetails(versionId: string) {
-  return invoke("get_version_details", { versionId });
+export async function prepareInstance(instanceId: string): Promise<string> {
+  return invoke("prepare_instance", { instanceId });
 }
 
-export async function downloadVersion(
-  instanceId: string,
-  versionId: string,
-) {
-  return invoke("download_version", { instanceId, versionId });
+export async function launchGame(instanceId: string): Promise<number> {
+  return invoke("launch_game", { instanceId });
+}
+
+export async function checkJava(): Promise<JavaInfo> {
+  return invoke("check_java");
+}
+
+// ── Mod Search ────────────────────────────────────────────────
+
+export interface ModSearchResult {
+  source: string;
+  project_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+}
+
+export async function modrinthSearch(
+  query: string,
+  offset?: number,
+  limit?: number
+): Promise<ModSearchResult[]> {
+  return invoke("modrinth_search", {
+    query,
+    offset: offset ?? 0,
+    limit: limit ?? 20,
+  });
+}
+
+export async function curseforgeSearch(
+  query: string,
+  offset?: number,
+  limit?: number
+): Promise<ModSearchResult[]> {
+  return invoke("curseforge_search", {
+    query,
+    offset: offset ?? 0,
+    limit: limit ?? 20,
+  });
+}
+
+// ── Settings ──────────────────────────────────────────────────
+
+export interface SettingsInfo {
+  default_memory_mb: string;
+  theme: string;
+  language: string;
+  java_path: string | null;
+  curseforge_api_key: string | null;
+}
+
+export async function getSettings(): Promise<SettingsInfo> {
+  return invoke("get_settings");
+}
+
+export async function updateSetting(key: string, value: string): Promise<void> {
+  return invoke("update_setting", { key, value });
 }
