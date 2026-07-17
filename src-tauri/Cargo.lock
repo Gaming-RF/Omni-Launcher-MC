@@ -2820,21 +2820,16 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "crc32fast",
  "dirs",
  "env_logger",
- "flate2",
- "futures-util",
  "hex",
  "log",
  "md5",
- "quick-xml 0.36.2",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
  "serde_json",
  "sha1",
- "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -2845,7 +2840,6 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-store",
  "tauri-plugin-window-state",
- "thiserror 2.0.18",
  "tokio",
  "urlencoding",
  "uuid",
@@ -3098,7 +3092,7 @@ checksum = "7da1d65da6dd5d1e44199ac0f58712d241c0f439f80adea8924d832384087f85"
 dependencies = [
  "base64 0.22.1",
  "indexmap 2.14.0",
- "quick-xml 0.41.0",
+ "quick-xml",
  "serde",
  "time",
 ]
@@ -3264,15 +3258,6 @@ checksum = "6f42ea446cab60335f76979ec15e12619a2165b5ae2c12166bef27d283a9fadf"
 dependencies = [
  "idna",
  "psl-types",
-]
-
-[[package]]
-name = "quick-xml"
-version = "0.36.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
-dependencies = [
- "memchr",
 ]
 
 [[package]]
