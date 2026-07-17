@@ -21,11 +21,7 @@ fn installer_url(_mc_version: &str, neoforge_version: &str) -> String {
 }
 
 /// Install NeoForge for an instance.
-pub async fn install(
-    base_dir: &Path,
-    mc_version: &str,
-    neoforge_version: &str,
-) -> Result<String> {
+pub async fn install(base_dir: &Path, mc_version: &str, neoforge_version: &str) -> Result<String> {
     let profile_id = format!("neoforge-{}-{}", mc_version, neoforge_version);
     let version_dir = base_dir.join("versions").join(&profile_id);
     std::fs::create_dir_all(&version_dir)?;
@@ -83,10 +79,8 @@ fn extract_version_json(
 
         if let Some(version_info) = profile.get("versionInfo") {
             let mut vi = version_info.clone();
-            vi["id"] = serde_json::Value::String(format!(
-                "neoforge-{}-{}",
-                mc_version, neoforge_version
-            ));
+            vi["id"] =
+                serde_json::Value::String(format!("neoforge-{}-{}", mc_version, neoforge_version));
             return Ok(vi);
         }
         return Ok(profile);
@@ -96,26 +90,19 @@ fn extract_version_json(
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
         let mut json: serde_json::Value = serde_json::from_str(&contents)?;
-        json["id"] = serde_json::Value::String(format!(
-            "neoforge-{}-{}",
-            mc_version, neoforge_version
-        ));
+        json["id"] =
+            serde_json::Value::String(format!("neoforge-{}-{}", mc_version, neoforge_version));
         return Ok(json);
     }
 
-    anyhow::bail!(
-        "Could not find install_profile.json or version.json in NeoForge installer"
-    )
+    anyhow::bail!("Could not find install_profile.json or version.json in NeoForge installer")
 }
 
 /// Get available NeoForge versions for a Minecraft version.
 /// NeoForge versions start with the MC version number (e.g., "24.1.1" for MC 1.21.x).
 pub async fn get_neoforge_versions(mc_version: &str) -> Result<Vec<String>> {
     let client = reqwest::Client::new();
-    let url = format!(
-        "{}/net/neoforged/neoforge/maven-metadata.xml",
-        MAVEN_BASE
-    );
+    let url = format!("{}/net/neoforged/neoforge/maven-metadata.xml", MAVEN_BASE);
 
     let resp = client
         .get(&url)

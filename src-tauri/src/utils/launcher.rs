@@ -16,7 +16,11 @@ pub struct GameLauncher {
 
 impl GameLauncher {
     pub fn new(base_dir: PathBuf, java_path: PathBuf, http_client: reqwest::Client) -> Self {
-        Self { base_dir, java_path, http_client }
+        Self {
+            base_dir,
+            java_path,
+            http_client,
+        }
     }
 
     fn versions_dir(&self) -> PathBuf {
@@ -48,7 +52,12 @@ impl GameLauncher {
         // 2. Download and parse version JSON
         let version_dir = self.versions_dir().join(&instance.game_version);
         let version_json_path = version_dir.join(format!("{}.json", instance.game_version));
-        minecraft::download_file(Some(&self.http_client), &version_entry.url, &version_json_path).await?;
+        minecraft::download_file(
+            Some(&self.http_client),
+            &version_entry.url,
+            &version_json_path,
+        )
+        .await?;
         let version_json = std::fs::read_to_string(&version_json_path)?;
         let version: minecraft::VersionDetails = serde_json::from_str(&version_json)?;
 
@@ -71,8 +80,13 @@ impl GameLauncher {
             if let Some(downloads) = &lib.downloads {
                 if let Some(artifact) = &downloads.artifact {
                     let path = self.libraries_dir().join(&artifact.path);
-                    minecraft::download_file_verified(Some(&self.http_client), &artifact.url, &path, &artifact.sha1)
-                        .await?;
+                    minecraft::download_file_verified(
+                        Some(&self.http_client),
+                        &artifact.url,
+                        &path,
+                        &artifact.sha1,
+                    )
+                    .await?;
                 }
             }
         }
@@ -82,7 +96,12 @@ impl GameLauncher {
             .assets_dir()
             .join("indexes")
             .join(format!("{}.json", version.assets));
-        minecraft::download_file(Some(&self.http_client), &version.asset_index.url, &asset_index_path).await?;
+        minecraft::download_file(
+            Some(&self.http_client),
+            &version.asset_index.url,
+            &asset_index_path,
+        )
+        .await?;
         let index_json = std::fs::read_to_string(&asset_index_path)?;
         let asset_index: minecraft::AssetIndexData = serde_json::from_str(&index_json)?;
 
@@ -97,7 +116,13 @@ impl GameLauncher {
                 "https://resources.download.minecraft.net/{}/{}",
                 hash_prefix, obj.hash
             );
-            minecraft::download_file_verified(Some(&self.http_client), &url, &asset_path, &obj.hash).await?;
+            minecraft::download_file_verified(
+                Some(&self.http_client),
+                &url,
+                &asset_path,
+                &obj.hash,
+            )
+            .await?;
         }
 
         // 6. Create instance game directory
@@ -219,7 +244,10 @@ impl GameLauncher {
         }
 
         // If no classpath arg in JVM args, add it
-        if !jvm_args.iter().any(|a| a.contains("-cp") || a.contains("classpath")) {
+        if !jvm_args
+            .iter()
+            .any(|a| a.contains("-cp") || a.contains("classpath"))
+        {
             jvm_args.push("-cp".to_string());
             jvm_args.push(classpath.clone());
         }
@@ -304,9 +332,7 @@ pub fn find_java(custom_path: Option<&str>) -> Result<PathBuf> {
         }
     }
 
-    anyhow::bail!(
-        "Java not found. Please install Java 21+ or set the Java path in Settings."
-    )
+    anyhow::bail!("Java not found. Please install Java 21+ or set the Java path in Settings.")
 }
 
 fn java_bin_name() -> &'static str {

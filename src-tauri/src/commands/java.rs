@@ -22,12 +22,9 @@ pub async fn ensure_java_for_mc(
     mc_version: String,
     custom_path: Option<String>,
 ) -> Result<JavaCheckResult, String> {
-    let path = java::ensure_java(
-        &mc_version,
-        custom_path.as_deref(),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let path = java::ensure_java(&mc_version, custom_path.as_deref())
+        .await
+        .map_err(|e| e.to_string())?;
 
     let major = java::java_version_for_mc(&mc_version);
     let auto_downloaded = java::is_java_installed(major)

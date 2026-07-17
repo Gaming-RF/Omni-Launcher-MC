@@ -247,11 +247,7 @@ pub async fn get_mod_files(
 }
 
 /// Get a specific file for a mod.
-pub async fn get_mod_file(
-    api_key: &str,
-    mod_id: i32,
-    file_id: i32,
-) -> Result<File> {
+pub async fn get_mod_file(api_key: &str, mod_id: i32, file_id: i32) -> Result<File> {
     let client = reqwest::Client::new();
     let resp: DataResponse<File> = client
         .get(format!("{}/v1/mods/{}/files/{}", BASE_URL, mod_id, file_id))
@@ -303,10 +299,7 @@ pub async fn get_file_download_url(
 /// Look up mods by file fingerprints (hashes).
 /// Used for cross-source matching: Modrinth SHA-1 → CurseForge match.
 /// `fingerprints` is a list of MurmurHash2 values (unsigned 32-bit).
-pub async fn get_fingerprints(
-    api_key: &str,
-    fingerprints: &[u64],
-) -> Result<FingerprintResponse> {
+pub async fn get_fingerprints(api_key: &str, fingerprints: &[u64]) -> Result<FingerprintResponse> {
     let client = reqwest::Client::new();
     let resp: FingerprintResponse = client
         .post(format!("{}/v1/fingerprints", BASE_URL))

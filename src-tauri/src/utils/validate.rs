@@ -12,7 +12,10 @@ pub fn validate_id(id: &str) -> Result<(), String> {
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
-        return Err("ID contains invalid characters (only alphanumeric, hyphens, underscores allowed)".to_string());
+        return Err(
+            "ID contains invalid characters (only alphanumeric, hyphens, underscores allowed)"
+                .to_string(),
+        );
     }
     // Prevent path traversal
     if id.contains("..") || id.contains('/') || id.contains('\\') {
@@ -100,9 +103,6 @@ mod tests {
     #[test]
     fn test_sanitize_query() {
         assert_eq!(sanitize_query("sodium\x00mod"), "sodiummod");
-        assert_eq!(
-            sanitize_query(&"a".repeat(300)).len(),
-            200
-        );
+        assert_eq!(sanitize_query(&"a".repeat(300)).len(), 200);
     }
 }

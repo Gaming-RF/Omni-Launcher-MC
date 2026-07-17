@@ -63,7 +63,11 @@ pub fn record_mod_install(
 }
 
 /// Toggle a mod's enabled state (renames the file to .disabled or back).
-pub fn toggle_mod(db: &rusqlite::Connection, mod_id: i64, mods_dir: &std::path::Path) -> Result<bool> {
+pub fn toggle_mod(
+    db: &rusqlite::Connection,
+    mod_id: i64,
+    mods_dir: &std::path::Path,
+) -> Result<bool> {
     let mods = get_mod_by_id(db, mod_id)?;
     let mod_info = mods.ok_or_else(|| anyhow::anyhow!("Mod not found"))?;
 
@@ -94,9 +98,12 @@ pub fn toggle_mod(db: &rusqlite::Connection, mod_id: i64, mods_dir: &std::path::
 }
 
 /// Remove a mod from an instance (delete file + DB record).
-pub fn remove_mod(db: &rusqlite::Connection, mod_id: i64, mods_dir: &std::path::Path) -> Result<()> {
-    let mod_info = get_mod_by_id(db, mod_id)?
-        .ok_or_else(|| anyhow::anyhow!("Mod not found"))?;
+pub fn remove_mod(
+    db: &rusqlite::Connection,
+    mod_id: i64,
+    mods_dir: &std::path::Path,
+) -> Result<()> {
+    let mod_info = get_mod_by_id(db, mod_id)?.ok_or_else(|| anyhow::anyhow!("Mod not found"))?;
 
     // Delete file from disk
     let file_path = mods_dir.join(&mod_info.file_name);

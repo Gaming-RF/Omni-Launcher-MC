@@ -5,10 +5,8 @@ use std::collections::HashMap;
 // Microsoft OAuth2 Device Code Flow constants
 // IMPORTANT: Replace with your own Azure AD app registration client ID
 const CLIENT_ID: &str = "YOUR_CLIENT_ID_HERE";
-const DEVICE_CODE_URL: &str =
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-const TOKEN_URL: &str =
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+const DEVICE_CODE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const SCOPE: &str = "XboxLive.signin offline_access";
 
 // Xbox Live endpoints
@@ -16,8 +14,7 @@ const XBL_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 
 // Minecraft services
-const MC_AUTH_URL: &str =
-    "https://api.minecraftservices.com/authentication/login_with_xbox";
+const MC_AUTH_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -92,31 +89,19 @@ pub async fn start_device_code_flow() -> Result<DeviceCodeResponse> {
         .context("Failed to parse device code response")?;
 
     if let Some(error) = body.get("error") {
-        anyhow::bail!(
-            "Device code error: {}",
-            error.as_str().unwrap_or("unknown")
-        );
+        anyhow::bail!("Device code error: {}", error.as_str().unwrap_or("unknown"));
     }
 
     Ok(DeviceCodeResponse {
-        device_code: body["device_code"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
-        user_code: body["user_code"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
+        device_code: body["device_code"].as_str().unwrap_or_default().to_string(),
+        user_code: body["user_code"].as_str().unwrap_or_default().to_string(),
         verification_uri: body["verification_uri"]
             .as_str()
             .unwrap_or_default()
             .to_string(),
         expires_in: body["expires_in"].as_u64().unwrap_or(900) as u32,
         interval: body["interval"].as_u64().unwrap_or(5) as u32,
-        message: body["message"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
+        message: body["message"].as_str().unwrap_or_default().to_string(),
     })
 }
 

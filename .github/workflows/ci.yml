@@ -60,6 +60,10 @@ jobs:
         working-directory: src-tauri
         run: cargo check
 
+      - name: Formatting
+        working-directory: src-tauri
+        run: cargo fmt -- --check
+
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy -- -D warnings

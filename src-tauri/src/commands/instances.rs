@@ -168,8 +168,7 @@ pub async fn duplicate_instance(
         let original = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
             .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id)
-            .map_err(|e| e.to_string())?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
         (original, mods)
     };
 

@@ -140,10 +140,7 @@ pub fn create_instance(
 }
 
 /// Update an existing instance.
-pub fn update_instance(
-    db: &rusqlite::Connection,
-    instance: &GameInstance,
-) -> Result<()> {
+pub fn update_instance(db: &rusqlite::Connection, instance: &GameInstance) -> Result<()> {
     db.execute(
         "UPDATE instances SET name = ?2, java_args = ?3, resolution = ?4, notes = ?5, 
          groups = ?6, allocated_memory_mb = ?7, icon = ?8 

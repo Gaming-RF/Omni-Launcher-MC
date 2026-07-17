@@ -71,9 +71,7 @@ pub fn run_migrations(db: &Connection) -> Result<()> {
 
     // Add per-instance Java override column if missing.
     // SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we catch the error.
-    match db.execute_batch(
-        "ALTER TABLE instances ADD COLUMN java_installation_id TEXT;",
-    ) {
+    match db.execute_batch("ALTER TABLE instances ADD COLUMN java_installation_id TEXT;") {
         Ok(()) => log::info!("Added java_installation_id column to instances table"),
         Err(_) => {
             // Column already exists — this is expected on subsequent runs

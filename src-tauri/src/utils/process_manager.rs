@@ -76,13 +76,7 @@ impl ProcessManager {
     }
 
     /// Spawn a managed child process. Captures stdout/stderr and streams to frontend.
-    pub fn spawn(
-        &self,
-        app: &tauri::AppHandle,
-        instance_id: &str,
-        mut child: Child,
-        pid: u32,
-    ) {
+    pub fn spawn(&self, app: &tauri::AppHandle, instance_id: &str, mut child: Child, pid: u32) {
         let iid = instance_id.to_string();
 
         // Take stdout and stderr

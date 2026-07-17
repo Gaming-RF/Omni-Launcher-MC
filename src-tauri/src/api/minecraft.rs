@@ -160,7 +160,10 @@ pub async fn fetch_version_manifest(client: Option<&reqwest::Client>) -> Result<
 }
 
 /// Fetch details for a specific version (by URL from the manifest).
-pub async fn fetch_version_details(client: Option<&reqwest::Client>, version_url: &str) -> Result<VersionDetails> {
+pub async fn fetch_version_details(
+    client: Option<&reqwest::Client>,
+    version_url: &str,
+) -> Result<VersionDetails> {
     let client = get_client(client);
     let details: VersionDetails = client
         .get(version_url)
@@ -175,7 +178,10 @@ pub async fn fetch_version_details(client: Option<&reqwest::Client>, version_url
 }
 
 /// Fetch an asset index.
-pub async fn fetch_asset_index(client: Option<&reqwest::Client>, index_url: &str) -> Result<AssetIndexData> {
+pub async fn fetch_asset_index(
+    client: Option<&reqwest::Client>,
+    index_url: &str,
+) -> Result<AssetIndexData> {
     let client = get_client(client);
     let index: AssetIndexData = client
         .get(index_url)

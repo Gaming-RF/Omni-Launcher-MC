@@ -1,6 +1,6 @@
+use crate::api::curseforge;
 use crate::api::minecraft;
 use crate::api::modrinth;
-use crate::api::curseforge;
 use crate::db;
 use crate::utils::launcher;
 use crate::utils::progress;
@@ -50,7 +50,12 @@ pub async fn prepare_instance(
     {
         let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
         if let Some(app) = handle_guard.as_ref() {
-            progress::phase_start(app, &task_id, "starting", &format!("Preparing {}...", instance.name));
+            progress::phase_start(
+                app,
+                &task_id,
+                "starting",
+                &format!("Preparing {}...", instance.name),
+            );
         }
     }
 
@@ -88,10 +93,7 @@ pub async fn prepare_instance(
 }
 
 #[tauri::command]
-pub async fn launch_game(
-    state: State<'_, AppState>,
-    instance_id: String,
-) -> Result<u32, String> {
+pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Result<u32, String> {
     let task_id = format!("launch-{}", instance_id);
 
     // Emit progress: starting
@@ -232,14 +234,9 @@ pub async fn modrinth_search(
     if query.is_empty() {
         return Err("Search query cannot be empty".to_string());
     }
-    let results = modrinth::search(
-        &query,
-        None,
-        offset.unwrap_or(0),
-        limit.unwrap_or(20),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let results = modrinth::search(&query, None, offset.unwrap_or(0), limit.unwrap_or(20))
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(results
         .hits
@@ -344,7 +341,12 @@ pub async fn launch_game_offline(
     {
         let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
         if let Some(app) = handle_guard.as_ref() {
-            progress::phase_start(app, &task_id, "starting", "Preparing to launch (offline)...");
+            progress::phase_start(
+                app,
+                &task_id,
+                "starting",
+                "Preparing to launch (offline)...",
+            );
         }
     }
 
@@ -392,7 +394,12 @@ pub async fn launch_game_offline(
     {
         let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
         if let Some(app) = handle_guard.as_ref() {
-            progress::phase_start(app, &task_id, "launching", "Starting Minecraft (offline)...");
+            progress::phase_start(
+                app,
+                &task_id,
+                "launching",
+                "Starting Minecraft (offline)...",
+            );
         }
     }
 
@@ -416,7 +423,11 @@ pub async fn launch_game_offline(
     {
         let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
         if let Some(app) = handle_guard.as_ref() {
-            progress::complete(app, &task_id, &format!("Minecraft launched as {} (PID {})", username, pid));
+            progress::complete(
+                app,
+                &task_id,
+                &format!("Minecraft launched as {} (PID {})", username, pid),
+            );
         }
     }
 

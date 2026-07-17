@@ -2,8 +2,8 @@ use crate::api::curseforge;
 use crate::api::loaders;
 use crate::api::minecraft;
 use crate::api::modrinth;
-use crate::db;
 use crate::commands::instances::InstanceListItem;
+use crate::db;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -250,13 +250,9 @@ pub async fn install_mod_from_modrinth(
     }
 
     // Get the latest version for this game version + loader
-    let versions = modrinth::get_project_versions(
-        &project_id,
-        Some(&loader),
-        Some(&game_version),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let versions = modrinth::get_project_versions(&project_id, Some(&loader), Some(&game_version))
+        .await
+        .map_err(|e| e.to_string())?;
 
     let version = versions
         .first()
@@ -423,16 +419,13 @@ pub async fn install_mrpack_modpack(
     if info.loader != "vanilla" && !info.loader_version.is_empty() {
         let result = match info.loader.as_str() {
             "fabric" => {
-                loaders::fabric::install(&base_dir, &info.game_version, &info.loader_version)
-                    .await
+                loaders::fabric::install(&base_dir, &info.game_version, &info.loader_version).await
             }
             "quilt" => {
-                loaders::quilt::install(&base_dir, &info.game_version, &info.loader_version)
-                    .await
+                loaders::quilt::install(&base_dir, &info.game_version, &info.loader_version).await
             }
             "forge" => {
-                loaders::forge::install(&base_dir, &info.game_version, &info.loader_version)
-                    .await
+                loaders::forge::install(&base_dir, &info.game_version, &info.loader_version).await
             }
             "neoforge" => {
                 loaders::neoforge::install(&base_dir, &info.game_version, &info.loader_version)
@@ -545,7 +538,10 @@ pub async fn install_mod_from_curseforge(
         mod_id,
         source: "curseforge".to_string(),
         name: mod_info.name,
-        version: file.display_name.clone().unwrap_or_else(|| file.file_name.clone()),
+        version: file
+            .display_name
+            .clone()
+            .unwrap_or_else(|| file.file_name.clone()),
         file_name: file.file_name.clone(),
         enabled: true,
         installed_at: chrono::Utc::now().to_rfc3339(),
@@ -585,13 +581,9 @@ pub async fn get_modrinth_versions(
     game_version: String,
     loader: String,
 ) -> Result<Vec<ModVersionInfo>, String> {
-    let versions = modrinth::get_project_versions(
-        &project_id,
-        Some(&loader),
-        Some(&game_version),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let versions = modrinth::get_project_versions(&project_id, Some(&loader), Some(&game_version))
+        .await
+        .map_err(|e| e.to_string())?;
 
     Ok(versions
         .into_iter()

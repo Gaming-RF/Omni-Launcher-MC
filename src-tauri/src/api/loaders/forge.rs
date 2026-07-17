@@ -37,11 +37,7 @@ fn installer_url(mc_version: &str, forge_version: &str) -> String {
 
 /// Install Forge for an instance.
 /// Downloads the installer, extracts the version JSON, and writes it.
-pub async fn install(
-    base_dir: &Path,
-    mc_version: &str,
-    forge_version: &str,
-) -> Result<String> {
+pub async fn install(base_dir: &Path, mc_version: &str, forge_version: &str) -> Result<String> {
     let profile_id = format!("forge-{}-{}", mc_version, forge_version);
     let version_dir = base_dir.join("versions").join(&profile_id);
     std::fs::create_dir_all(&version_dir)?;
@@ -61,7 +57,9 @@ pub async fn install(
         .context("Failed to read Forge installer response")?;
 
     // Write installer to temp file
-    let installer_path = base_dir.join("cache").join(format!("forge-{}-installer.jar", profile_id));
+    let installer_path = base_dir
+        .join("cache")
+        .join(format!("forge-{}-installer.jar", profile_id));
     if let Some(parent) = installer_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -99,10 +97,7 @@ fn extract_version_json(
         if let Some(version_info) = profile.get("versionInfo") {
             let mut vi = version_info.clone();
             // Override the ID so it doesn't conflict
-            vi["id"] = serde_json::Value::String(format!(
-                "forge-{}-{}",
-                mc_version, forge_version
-            ));
+            vi["id"] = serde_json::Value::String(format!("forge-{}-{}", mc_version, forge_version));
             return Ok(vi);
         }
 
@@ -115,24 +110,18 @@ fn extract_version_json(
         let mut contents = String::new();
         f.read_to_string(&mut contents)?;
         let mut json: serde_json::Value = serde_json::from_str(&contents)?;
-        json["id"] =
-            serde_json::Value::String(format!("forge-{}-{}", mc_version, forge_version));
+        json["id"] = serde_json::Value::String(format!("forge-{}-{}", mc_version, forge_version));
         return Ok(json);
     }
 
-    anyhow::bail!(
-        "Could not find install_profile.json or version.json in Forge installer"
-    )
+    anyhow::bail!("Could not find install_profile.json or version.json in Forge installer")
 }
 
 /// Get the Forge version string for a given MC version from the Maven metadata.
 /// This queries the Maven directory listing which is XML.
 pub async fn get_forge_versions(mc_version: &str) -> Result<Vec<String>> {
     let client = reqwest::Client::new();
-    let url = format!(
-        "{}/net/minecraftforge/forge/maven-metadata.xml",
-        MAVEN_BASE
-    );
+    let url = format!("{}/net/minecraftforge/forge/maven-metadata.xml", MAVEN_BASE);
 
     let resp = client
         .get(&url)

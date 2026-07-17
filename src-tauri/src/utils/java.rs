@@ -100,11 +100,14 @@ pub fn is_java_installed(java_major: u32) -> Option<PathBuf> {
         // Try to find the JDK inside a subdirectory (Adoptium extracts to jdk-X.X.X+XX/)
         for entry in std::fs::read_dir(&dir).ok()?.flatten() {
             if entry.file_type().ok()?.is_dir() {
-                let candidate = entry.path().join("bin").join(if cfg!(target_os = "windows") {
-                    "java.exe"
-                } else {
-                    "java"
-                });
+                let candidate = entry
+                    .path()
+                    .join("bin")
+                    .join(if cfg!(target_os = "windows") {
+                        "java.exe"
+                    } else {
+                        "java"
+                    });
                 if candidate.exists() {
                     return Some(candidate);
                 }
@@ -200,8 +203,8 @@ pub async fn download_java(java_major: u32) -> Result<PathBuf> {
     let _ = std::fs::remove_file(&temp_path);
 
     // Find and return the java binary path
-    let java_path = is_java_installed(java_major)
-        .context("JDK downloaded but java binary not found")?;
+    let java_path =
+        is_java_installed(java_major).context("JDK downloaded but java binary not found")?;
 
     log::info!("JDK {} installed at {:?}", java_major, java_path);
     Ok(java_path)
@@ -209,10 +212,7 @@ pub async fn download_java(java_major: u32) -> Result<PathBuf> {
 
 /// Find Java: check settings, local install, then system.
 /// Auto-downloads if nothing is found.
-pub async fn ensure_java(
-    mc_version: &str,
-    custom_path: Option<&str>,
-) -> Result<PathBuf> {
+pub async fn ensure_java(mc_version: &str, custom_path: Option<&str>) -> Result<PathBuf> {
     // 1. Custom path from settings
     if let Some(path) = custom_path {
         let p = PathBuf::from(path);
@@ -230,10 +230,7 @@ pub async fn ensure_java(
     // 3. System Java (via existing launcher.rs detection)
     if let Ok(path) = crate::utils::launcher::find_java(None) {
         // Verify the version is sufficient
-        if let Ok(output) = std::process::Command::new(&path)
-            .arg("-version")
-            .output()
-        {
+        if let Ok(output) = std::process::Command::new(&path).arg("-version").output() {
             let version_str = String::from_utf8_lossy(&output.stderr);
             if check_java_version_sufficient(&version_str, required_major) {
                 return Ok(path);
