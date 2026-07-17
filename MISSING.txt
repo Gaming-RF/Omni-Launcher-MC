@@ -8,6 +8,13 @@
 - [x] Game launch orchestration (implemented)
 - [x] SQLite database schema & CRUD (implemented)
 - [x] Version manifest + asset downloader (implemented)
+- [x] Download progress tracking via Tauri events (implemented)
+- [x] Toast notification system (implemented)
+- [x] Java auto-download from Eclipse Adoptium (implemented)
+- [x] Instance detail page with mod management (implemented)
+- [x] Modpack import (Modrinth .mrpack + CurseForge) (implemented)
+- [x] All 4 mod loader installers (Fabric/Quilt/Forge/NeoForge) (implemented)
+- [x] CI/CD pipeline (GitHub Actions) (implemented)
 
 ## 🔴 Required Before First Use
 
@@ -35,13 +42,10 @@ sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev \
 Fedora: `webkit2gtk4.1-devel libsoup3-devel javascriptcoregtk4.1-devel openssl-devel`
 Arch: `webkit2gtk-4.1 libsoup3 javascriptcoregtk-4.1 openssl`
 
-### 4. Java 21+ (at Runtime)
-Minecraft 1.20.5+ requires Java 21. The launcher auto-detects Java from:
-- `JAVA_HOME` environment variable
-- Common install paths (platform-specific)
-- System `PATH`
-
-You can also set a custom path in Settings > Java.
+### 4. Java Runtime
+The launcher auto-downloads Java from Eclipse Adoptium when needed (Java 8, 16, 17, or 21
+depending on the Minecraft version). No manual Java installation required.
+Users can also set a custom Java path in Settings.
 
 ## 🟢 Nice-to-Have (Not Blocking)
 

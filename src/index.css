@@ -23,6 +23,21 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* Slide-in animation for toasts */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
 /* Ensure the app fills the viewport */
 html, body, #root {
   height: 100%;

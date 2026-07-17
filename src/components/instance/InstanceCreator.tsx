@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Button from "../common/Button";
 import Modal from "../common/Modal";
+import LoaderVersionSelector from "../common/LoaderVersionSelector";
 import { useInstancesStore } from "../../stores/instances";
 import type { VersionEntry, ModpackInfo } from "../../lib/tauri";
 import {
@@ -18,6 +19,7 @@ export function InstanceCreator() {
   const [name, setName] = useState("");
   const [gameVersion, setGameVersion] = useState("");
   const [loader, setLoader] = useState("vanilla");
+  const [loaderVersion, setLoaderVersion] = useState<string | null>(null);
   const [memory, setMemory] = useState(4096);
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
@@ -49,7 +51,7 @@ export function InstanceCreator() {
         name,
         game_version: gameVersion,
         loader,
-        loader_version: null,
+        loader_version: loaderVersion,
         icon: null,
         java_args: null,
         allocated_memory_mb: memory,
@@ -108,6 +110,7 @@ export function InstanceCreator() {
     setName("");
     setGameVersion("");
     setLoader("vanilla");
+    setLoaderVersion(null);
     setMemory(4096);
     setModpackPath(null);
     setModpackInfo(null);
@@ -188,7 +191,10 @@ export function InstanceCreator() {
                 <label className="block text-sm text-slate-300 mb-1">Mod Loader</label>
                 <select
                   value={loader}
-                  onChange={(e) => setLoader(e.target.value)}
+                  onChange={(e) => {
+                    setLoader(e.target.value);
+                    setLoaderVersion(null);
+                  }}
                   className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
                 >
                   <option value="vanilla">Vanilla</option>
@@ -198,6 +204,21 @@ export function InstanceCreator() {
                   <option value="quilt">Quilt</option>
                 </select>
               </div>
+
+              {/* Loader Version (auto-fetched) */}
+              {loader !== "vanilla" && gameVersion && (
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">
+                    {loader.charAt(0).toUpperCase() + loader.slice(1)} Version
+                  </label>
+                  <LoaderVersionSelector
+                    loader={loader}
+                    gameVersion={gameVersion}
+                    value={loaderVersion}
+                    onChange={setLoaderVersion}
+                  />
+                </div>
+              )}
 
               {/* Memory */}
               <div>

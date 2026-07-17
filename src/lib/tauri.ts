@@ -327,3 +327,44 @@ export async function downloadJavaVersion(javaMajor: number): Promise<string> {
   return invoke("download_java_version", { javaMajor });
 }
 
+// ── Instance Sharing ──────────────────────────────────────────
+
+export interface ShareCode {
+  code: string;
+  name: string;
+  mod_count: number;
+}
+
+export async function exportInstanceShare(instanceId: string): Promise<ShareCode> {
+  return invoke("export_instance_share", { instanceId });
+}
+
+export async function importInstanceShare(code: string): Promise<InstanceListItem> {
+  return invoke("import_instance_share", { payload: { code } });
+}
+
+// ── Aggregated Search ─────────────────────────────────────────
+
+export interface AggregatedSearchResult {
+  source: string;
+  project_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+}
+
+export async function aggregatedSearch(
+  query: string,
+  offset?: number,
+  limit?: number
+): Promise<AggregatedSearchResult[]> {
+  return invoke("aggregated_search", {
+    query,
+    offset: offset ?? 0,
+    limit: limit ?? 20,
+  });
+}
+

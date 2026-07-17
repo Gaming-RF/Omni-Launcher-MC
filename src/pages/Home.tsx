@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Play, Trash2, Clock, ChevronRight } from "lucide-react";
+import { Play, Trash2, Clock, ChevronRight, Share2, Download } from "lucide-react";
 import { InstanceCreator } from "../components/instance/InstanceCreator";
 import { InstanceDetail } from "./InstanceDetail";
+import { ShareExportDialog, ShareImportDialog } from "../components/common/ShareDialog";
 import { useInstancesStore } from "../stores/instances";
 import { useAuthStore } from "../stores/auth";
 import type { InstanceListItem } from "../lib/tauri";
@@ -12,6 +13,8 @@ export function Home() {
   const launchGame = useInstancesStore((s) => s.launchGame);
   const activeAccount = useAuthStore((s) => s.activeAccount);
   const [selectedInstance, setSelectedInstance] = useState<InstanceListItem | null>(null);
+  const [shareInstance, setShareInstance] = useState<InstanceListItem | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   // If an instance is selected, show the detail view
   if (selectedInstance) {
@@ -32,6 +35,7 @@ export function Home() {
   };
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -44,7 +48,16 @@ export function Home() {
               : `${instances.length} instance${instances.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <InstanceCreator />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+          >
+            <Download size={14} />
+            Import
+          </button>
+          <InstanceCreator />
+        </div>
       </div>
 
       {instances.length === 0 ? (
@@ -86,6 +99,16 @@ export function Home() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      setShareInstance(instance);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-blue-400 transition-all p-1"
+                    title="Share instance"
+                  >
+                    <Share2 size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       deleteInstance(instance.id);
                     }}
                     className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1"
@@ -122,5 +145,18 @@ export function Home() {
         </div>
       )}
     </div>
+    {/* Share dialogs */}
+    {shareInstance && (
+      <ShareExportDialog
+        instance={shareInstance}
+        isOpen={!!shareInstance}
+        onClose={() => setShareInstance(null)}
+      />
+    )}
+    <ShareImportDialog
+      isOpen={showImport}
+      onClose={() => setShowImport(false)}
+    />
+    </>
   );
 }

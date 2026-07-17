@@ -11,9 +11,10 @@ use tauri::Manager;
 /// Application state shared across commands via Tauri managed state.
 pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
-    /// Shared HTTP client with connection pooling. All API modules should use this
-    /// instead of creating their own `reqwest::Client::new()`.
+    /// Shared HTTP client with connection pooling.
     pub http: reqwest::Client,
+    /// App handle for emitting events (progress, notifications).
+    pub app_handle: Mutex<Option<tauri::AppHandle>>,
 }
 
 fn main() {
@@ -53,6 +54,7 @@ fn main() {
             app.manage(AppState {
                 db: Mutex::new(conn),
                 http: http_client,
+                app_handle: Mutex::new(Some(app.handle().clone())),
             });
 
             log::info!("OmniLauncherMC initialized. Data dir: {:?}", data_dir);
