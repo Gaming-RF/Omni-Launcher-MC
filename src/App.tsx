@@ -11,6 +11,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useNotificationStore } from "./stores/notificationStore";
 import { DownloadProgress } from "./components/common/DownloadProgress";
 import { ToastContainer } from "./components/common/Toast";
+import { PageTransition } from "./components/common/PageTransition";
 
 export default function App() {
   const { init } = useAppInit();
@@ -35,10 +36,10 @@ export default function App() {
       <Sidebar />
       <main className="flex-1 overflow-y-auto p-6">
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/instance/:id" element={<InstanceDetailPage />} />
-          <Route path="/discover" element={<Discover />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+          <Route path="/instance/:id" element={<PageTransition><InstanceDetailPage /></PageTransition>} />
+          <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
+          <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
         </Routes>
       </main>
 

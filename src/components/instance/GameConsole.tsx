@@ -1,7 +1,72 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Terminal, Trash2, Clock, XCircle, StopCircle } from "lucide-react";
+import { Terminal, Trash2, Clock, XCircle, StopCircle, Search, AlertTriangle } from "lucide-react";
 import { getGameLogs, killGame } from "../../lib/tauri";
+
+// Common crash patterns and their suggested fixes
+const CRASH_PATTERNS: { pattern: RegExp; title: string; fix: string }[] = [
+  {
+    pattern: /java\.lang\.OutOfMemoryError/i,
+    title: "Out of Memory",
+    fix: "Increase allocated RAM in instance settings (try 4096 MB or higher)",
+  },
+  {
+    pattern: /UnsupportedClassVersionError/i,
+    title: "Java Version Mismatch",
+    fix: "Install a newer Java version compatible with this Minecraft version",
+  },
+  {
+    pattern: /IncompatibleClassChangeError|NoSuchMethodError/i,
+    title: "Mod Compatibility Issue",
+    fix: "Remove recently added mods or check for mod updates",
+  },
+  {
+    pattern: /ModResolutionException|Missing or unsupported mandatory dependencies/i,
+    title: "Missing Mod Dependencies",
+    fix: "Install the required dependency mods listed in the error",
+  },
+  {
+    pattern: /java\.net\.(ConnectException|SocketTimeoutException)/i,
+    title: "Network Connection Failed",
+    fix: "Check your internet connection or try again later",
+  },
+  {
+    pattern: /Failed to start the minecraft server/i,
+    title: "Server Launch Failed",
+    fix: "Check port availability and server configuration",
+  },
+  {
+    pattern: /GLFW error.*65543|GLFW.*not initialized/i,
+    title: "Graphics/GLFW Error",
+    fix: "Update GPU drivers or try using a different Java version",
+  },
+  {
+    pattern: /Exit code: -1\b/i,
+    title: "Abnormal Exit",
+    fix: "Check the console for specific error messages above",
+  },
+  {
+    pattern: /Exit code: -80/i,
+    title: "Insufficient Memory",
+    fix: "Allocate more RAM or close other applications",
+  },
+  {
+    pattern: /Exit code: 1\b/i,
+    title: "Game Crash",
+    fix: "Check the console log above for the specific error",
+  },
+];
+
+function detectCrashPattern(lines: string[]): { title: string; fix: string } | null {
+  for (const line of lines) {
+    for (const { pattern, title, fix } of CRASH_PATTERNS) {
+      if (pattern.test(line)) {
+        return { title, fix };
+      }
+    }
+  }
+  return null;
+}
 
 interface GameLogEvent {
   instance_id: string;
@@ -27,10 +92,26 @@ export function GameConsole({ instanceId }: Props) {
     code: number | null;
   } | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const hasLoadedHistory = useRef(false);
+
+  // Crash detection based on log content
+  const crashInfo = useMemo(() => {
+    if (exitInfo && exitInfo.code !== 0) {
+      return detectCrashPattern(lines.map((l) => l.text));
+    }
+    return null;
+  }, [exitInfo, lines]);
+
+  // Filter lines by search
+  const filteredLines = useMemo(() => {
+    if (!searchFilter.trim()) return lines;
+    const q = searchFilter.toLowerCase();
+    return lines.filter((l) => l.text.toLowerCase().includes(q));
+  }, [lines, searchFilter]);
 
   // Detect if user scrolls away from bottom
   const handleScroll = useCallback(() => {
@@ -195,22 +276,50 @@ export function GameConsole({ instanceId }: Props) {
         </div>
       )}
 
+      {/* Crash analysis banner */}
+      {crashInfo && (
+        <div className="flex items-start gap-3 px-3 py-3 rounded-lg text-sm mb-2 bg-amber-400/10 text-amber-300 border border-amber-400/20">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-200">Crash Detected: {crashInfo.title}</p>
+            <p className="text-xs text-amber-400 mt-1">Suggested fix: {crashInfo.fix}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Log search */}
+      <div className="relative mb-2">
+        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          value={searchFilter}
+          onChange={(e) => setSearchFilter(e.target.value)}
+          placeholder="Filter logs..."
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-zinc-600"
+        />
+        {searchFilter && (
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
+            {filteredLines.length}/{lines.length}
+          </span>
+        )}
+      </div>
+
       {/* Log output */}
       <div
         ref={containerRef}
         onScroll={handleScroll}
         className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg overflow-y-auto font-mono text-xs leading-relaxed p-3 min-h-[300px] max-h-[500px]"
       >
-        {lines.length === 0 ? (
+        {filteredLines.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-600">
             <Terminal size={24} className="mb-2" />
-            <p>No console output yet</p>
-            <p className="text-[11px] mt-1">
-              Launch the game to see logs here
-            </p>
+            <p>{searchFilter ? "No matching lines" : "No console output yet"}</p>
+            {!searchFilter && (
+              <p className="text-[11px] mt-1">Launch the game to see logs here</p>
+            )}
           </div>
         ) : (
-          lines.map((line, i) => (
+          filteredLines.map((line, i) => (
             <div
               key={i}
               className={`flex gap-2 ${

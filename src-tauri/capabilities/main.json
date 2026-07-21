@@ -19,6 +19,7 @@
     "notification:allow-is-permission-granted",
     "notification:allow-request-permission",
     "process:default",
-    "window-state:default"
+    "window-state:default",
+    "updater:default"
   ]
 }

@@ -10,6 +10,7 @@ interface AuthState {
 
   fetchAccounts: () => Promise<void>;
   removeAccount: (uuid: string) => Promise<void>;
+  switchAccount: (uuid: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -41,6 +42,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         accounts: remaining,
         activeAccount: remaining[0] ?? null,
+      });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  switchAccount: async (uuid: string) => {
+    try {
+      const account = await tauri.switchActiveAccount(uuid);
+      const { accounts } = get();
+      // Reorder accounts so the active one is first
+      const reordered = [
+        account,
+        ...accounts.filter((a) => a.uuid !== uuid),
+      ];
+      set({
+        accounts: reordered,
+        activeAccount: account,
       });
     } catch (err) {
       set({ error: String(err) });

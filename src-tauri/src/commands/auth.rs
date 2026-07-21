@@ -105,3 +105,31 @@ pub fn remove_account(state: State<'_, AppState>, uuid: String) -> Result<(), St
     db::accounts::delete_account(&db, &uuid).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+/// Switch the active account. Reorders so the selected account is first.
+#[tauri::command]
+pub fn switch_active_account(
+    state: State<'_, AppState>,
+    uuid: String,
+) -> Result<AccountInfo, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Set the active account timestamp to now (making it the most recent)
+    db.execute(
+        "UPDATE accounts SET last_used = ?1 WHERE uuid = ?2",
+        rusqlite::params![chrono::Utc::now().to_rfc3339(), uuid],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let account = db::accounts::get_all_accounts(&db)
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|a| a.uuid == uuid)
+        .ok_or("Account not found")?;
+
+    Ok(AccountInfo {
+        uuid: account.uuid,
+        username: account.username,
+        skin_url: account.skin_url,
+    })
+}

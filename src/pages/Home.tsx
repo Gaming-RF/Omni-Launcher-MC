@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { useInstancesStore } from "../stores/instances";
 import { useActiveAccount } from "../hooks/useActiveAccount";
 import type { InstanceListItem } from "../lib/tauri";
+import { InstanceCardSkeleton } from "../components/common/Skeleton";
 
 type SortOption = "last-played" | "name-asc" | "name-desc" | "newest" | "oldest";
 
@@ -34,6 +35,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 
 export function Home() {
   const instances = useInstancesStore((s) => s.instances);
+  const loading = useInstancesStore((s) => s.loading);
   const deleteInstance = useInstancesStore((s) => s.deleteInstance);
   const launchGame = useInstancesStore((s) => s.launchGame);
   const launchGameOffline = useInstancesStore((s) => s.launchGameOffline);
@@ -189,8 +191,14 @@ export function Home() {
         </div>
       </div>
 
-      {/* Empty state: no instances at all */}
-      {instances.length === 0 ? (
+      {/* Loading skeletons */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <InstanceCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : instances.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
             <Gamepad2 size={28} className="text-slate-600" />

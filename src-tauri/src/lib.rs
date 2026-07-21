@@ -31,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Initialize data directories
             let data_dir = utils::paths::data_dir();
@@ -70,6 +71,7 @@ pub fn run() {
             commands::auth::poll_login,
             commands::auth::get_accounts,
             commands::auth::remove_account,
+            commands::auth::switch_active_account,
             // Instance commands
             commands::instances::get_instances,
             commands::instances::create_instance,
@@ -124,6 +126,17 @@ pub fn run() {
             commands::instances::import_instance_share,
             // Aggregated search
             commands::minecraft::aggregated_search,
+            // Modpack browsing + one-click install
+            commands::minecraft::search_modpacks_modrinth,
+            commands::minecraft::search_modpacks_curseforge,
+            commands::minecraft::get_modpack_versions_modrinth,
+            commands::minecraft::download_and_install_modpack,
+            // Mod update checker
+            commands::loaders::check_mod_updates,
+            // Resource packs & shaders
+            commands::minecraft::list_installed_packs,
+            commands::minecraft::toggle_pack,
+            commands::minecraft::delete_pack,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");

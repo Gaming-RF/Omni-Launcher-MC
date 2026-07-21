@@ -30,6 +30,10 @@ export async function removeAccount(uuid: string): Promise<void> {
   return invoke("remove_account", { uuid });
 }
 
+export async function switchActiveAccount(uuid: string): Promise<AccountInfo> {
+  return invoke("switch_active_account", { uuid });
+}
+
 // ── Instances ─────────────────────────────────────────────────
 
 export interface InstanceListItem {
@@ -457,5 +461,108 @@ export async function aggregatedSearch(
     offset: offset ?? 0,
     limit: limit ?? 20,
   });
+}
+
+// ── Modpack Browsing + One-Click Install ──────────────────────
+
+export interface ModpackSearchResult {
+  source: string;
+  project_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+  game_versions: string[];
+}
+
+export interface ModVersionInfo {
+  version_id: string;
+  name: string;
+  version_number: string;
+  date_published: string;
+  download_count: number;
+  file_name: string | null;
+  file_url: string | null;
+  game_versions: string[];
+}
+
+export async function searchModpacksModrinth(
+  query: string,
+  offset: number = 0,
+  limit: number = 20
+): Promise<ModpackSearchResult[]> {
+  return invoke("search_modpacks_modrinth", { query, offset, limit });
+}
+
+export async function searchModpacksCurseforge(
+  query: string,
+  offset: number = 0,
+  limit: number = 20
+): Promise<ModpackSearchResult[]> {
+  return invoke("search_modpacks_curseforge", { query, offset, limit });
+}
+
+export async function getModpackVersionsModrinth(
+  projectId: string
+): Promise<ModVersionInfo[]> {
+  return invoke("get_modpack_versions_modrinth", { projectId });
+}
+
+export async function downloadAndInstallModpack(
+  downloadUrl: string,
+  source: string,
+  name: string
+): Promise<InstanceListItem> {
+  return invoke("download_and_install_modpack", { downloadUrl, source, name });
+}
+
+// ── Mod Update Checker ───────────────────────────────────────
+
+export interface ModUpdateInfo {
+  mod_id: string;
+  mod_name: string;
+  source: string;
+  installed_version: string;
+  latest_version: string;
+  latest_file_url: string | null;
+  update_available: boolean;
+}
+
+export async function checkModUpdates(
+  instanceId: string
+): Promise<ModUpdateInfo[]> {
+  return invoke("check_mod_updates", { instanceId });
+}
+
+// ── Resource Packs & Shaders ─────────────────────────────────
+
+export interface InstalledPackInfo {
+  file_name: string;
+  enabled: boolean;
+}
+
+export async function listInstalledPacks(
+  instanceId: string,
+  packType: "resourcepacks" | "shaderpacks"
+): Promise<InstalledPackInfo[]> {
+  return invoke("list_installed_packs", { instanceId, packType });
+}
+
+export async function togglePack(
+  instanceId: string,
+  packType: "resourcepacks" | "shaderpacks",
+  fileName: string
+): Promise<boolean> {
+  return invoke("toggle_pack", { instanceId, packType, fileName });
+}
+
+export async function deletePack(
+  instanceId: string,
+  packType: "resourcepacks" | "shaderpacks",
+  fileName: string
+): Promise<void> {
+  return invoke("delete_pack", { instanceId, packType, fileName });
 }
 

@@ -595,6 +595,7 @@ pub async fn get_modrinth_versions(
             download_count: v.downloads as i64,
             file_name: v.files.first().map(|f| f.filename.clone()),
             file_url: v.files.first().map(|f| f.url.clone()),
+            game_versions: v.game_versions,
         })
         .collect())
 }
@@ -637,6 +638,7 @@ pub async fn get_curseforge_versions(
             download_count: f.download_count,
             file_name: Some(f.file_name),
             file_url: f.download_url,
+            game_versions: f.game_versions,
         })
         .collect())
 }
@@ -650,4 +652,64 @@ pub struct ModVersionInfo {
     pub download_count: i64,
     pub file_name: Option<String>,
     pub file_url: Option<String>,
+    pub game_versions: Vec<String>,
+}
+
+// ── Mod Update Checker ─────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct ModUpdateInfo {
+    pub mod_id: String,
+    pub mod_name: String,
+    pub source: String,
+    pub installed_version: String,
+    pub latest_version: String,
+    pub latest_file_url: Option<String>,
+    pub update_available: bool,
+}
+
+/// Check all installed mods for an instance and return update info.
+/// Only works for Modrinth mods (CurseForge requires more complex matching).
+#[tauri::command]
+pub async fn check_mod_updates(
+    state: State<'_, AppState>,
+    instance_id: String,
+) -> Result<Vec<ModUpdateInfo>, String> {
+    let installed = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?
+    };
+
+    let mut updates = Vec::new();
+
+    for m in &installed {
+        if m.source != "modrinth" {
+            continue; // Only check Modrinth mods for now
+        }
+
+        // Get the latest version for this project
+        match modrinth::get_project_versions(&m.mod_id, None, None).await {
+            Ok(versions) => {
+                if let Some(latest) = versions.first() {
+                    let latest_ver = latest.version_number.clone();
+                    let has_update = latest_ver != m.version;
+
+                    updates.push(ModUpdateInfo {
+                        mod_id: m.mod_id.clone(),
+                        mod_name: m.name.clone(),
+                        source: m.source.clone(),
+                        installed_version: m.version.clone(),
+                        latest_version: latest_ver,
+                        latest_file_url: latest.files.first().map(|f| f.url.clone()),
+                        update_available: has_update,
+                    });
+                }
+            }
+            Err(_) => {
+                // Skip mods we can't check
+            }
+        }
+    }
+
+    Ok(updates)
 }

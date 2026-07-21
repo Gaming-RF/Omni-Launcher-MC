@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-const BASE_URL: &str = "https://api.curseforge.com";
-const MINECRAFT_GAME_ID: i32 = 432;
+pub const BASE_URL: &str = "https://api.curseforge.com";
+pub const MINECRAFT_GAME_ID: i32 = 432;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResponse {

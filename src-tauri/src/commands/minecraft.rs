@@ -1,6 +1,9 @@
 use crate::api::curseforge;
+use crate::api::loaders;
 use crate::api::minecraft;
 use crate::api::modrinth;
+use crate::commands::instances::InstanceListItem;
+use crate::commands::loaders::ModVersionInfo;
 use crate::db;
 use crate::utils::launcher;
 use crate::utils::progress;
@@ -305,6 +308,448 @@ pub async fn curseforge_search(
                 .collect(),
         })
         .collect())
+}
+
+// ── Modpack Search ─────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct ModpackSearchResult {
+    pub source: String,
+    pub project_id: String,
+    pub slug: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: String,
+    pub downloads: u64,
+    pub categories: Vec<String>,
+    pub game_versions: Vec<String>,
+}
+
+/// Search Modrinth for modpacks specifically.
+#[tauri::command]
+pub async fn search_modpacks_modrinth(
+    query: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
+) -> Result<Vec<ModpackSearchResult>, String> {
+    let query = crate::utils::validate::sanitize_query(&query);
+    let facets = r#"[["project_type:modpack"]]"#;
+    let results = modrinth::search(
+        &query,
+        Some(facets),
+        offset.unwrap_or(0),
+        limit.unwrap_or(20),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(results
+        .hits
+        .into_iter()
+        .map(|h| ModpackSearchResult {
+            source: "modrinth".to_string(),
+            project_id: h.project_id,
+            slug: h.slug,
+            title: h.title,
+            description: h.description,
+            icon_url: h.icon_url,
+            downloads: h.downloads,
+            categories: h.display_categories.unwrap_or_default(),
+            game_versions: h.versions,
+        })
+        .collect())
+}
+
+/// Search CurseForge for modpacks specifically (classId=4471).
+#[tauri::command]
+pub async fn search_modpacks_curseforge(
+    state: State<'_, AppState>,
+    query: String,
+    offset: Option<i32>,
+    limit: Option<i32>,
+) -> Result<Vec<ModpackSearchResult>, String> {
+    let query = crate::utils::validate::sanitize_query(&query);
+
+    let api_key = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db::settings::get_curseforge_api_key(&db)
+            .map_err(|e| e.to_string())?
+            .ok_or("CurseForge API key not configured. Add it in Settings.")?
+    };
+
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/v1/mods/search?gameId={}&classId=4471&searchFilter={}&index={}&pageSize={}",
+        crate::api::curseforge::BASE_URL,
+        crate::api::curseforge::MINECRAFT_GAME_ID,
+        urlencoding::encode(&query),
+        offset.unwrap_or(0),
+        limit.unwrap_or(20),
+    );
+
+    let resp: crate::api::curseforge::SearchResponse = client
+        .get(&url)
+        .header("x-api-key", &api_key)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(resp
+        .data
+        .into_iter()
+        .map(|m| {
+            let game_versions = m
+                .latest_files
+                .as_ref()
+                .map(|files| {
+                    files
+                        .iter()
+                        .flat_map(|f| f.game_versions.clone())
+                        .collect::<std::collections::HashSet<_>>()
+                        .into_iter()
+                        .collect()
+                })
+                .unwrap_or_default();
+            ModpackSearchResult {
+                source: "curseforge".to_string(),
+                project_id: m.id.to_string(),
+                slug: m.slug,
+                title: m.name,
+                description: m.summary,
+                icon_url: m.logo.and_then(|l| l.url).unwrap_or_default(),
+                downloads: m.download_count.max(0) as u64,
+                categories: m
+                    .categories
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| c.name)
+                    .collect(),
+                game_versions,
+            }
+        })
+        .collect())
+}
+
+/// Get available versions for a Modrinth modpack.
+#[tauri::command]
+pub async fn get_modpack_versions_modrinth(
+    project_id: String,
+) -> Result<Vec<ModVersionInfo>, String> {
+    let versions = modrinth::get_project_versions(&project_id, None, None)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(versions
+        .into_iter()
+        .map(|v| ModVersionInfo {
+            version_id: v.id,
+            name: v.name,
+            version_number: v.version_number,
+            date_published: v.date_published,
+            download_count: v.downloads as i64,
+            file_name: v.files.first().map(|f| f.filename.clone()),
+            file_url: v.files.first().map(|f| f.url.clone()),
+            game_versions: v.game_versions,
+        })
+        .collect())
+}
+
+/// Download a modpack from URL, parse, create instance, install everything.
+/// This is the one-click modpack install command.
+#[tauri::command]
+pub async fn download_and_install_modpack(
+    state: State<'_, AppState>,
+    download_url: String,
+    source: String,
+    name: String,
+) -> Result<InstanceListItem, String> {
+    let task_id = format!("modpack-{}", uuid::Uuid::new_v4());
+
+    // Emit progress: downloading
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(
+                app,
+                &task_id,
+                "modpack",
+                &format!("Downloading {}...", name),
+            );
+        }
+    }
+
+    // Download the modpack file
+    let temp_dir = std::env::temp_dir().join("omc-modpacks");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    let ext = if download_url.ends_with(".mrpack") {
+        ".mrpack"
+    } else {
+        ".zip"
+    };
+    let temp_path = temp_dir.join(format!("{}{}", uuid::Uuid::new_v4(), ext));
+
+    let bytes = state
+        .http
+        .get(&download_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .bytes()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    std::fs::write(&temp_path, &bytes).map_err(|e| e.to_string())?;
+
+    // Emit progress: parsing
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(app, &task_id, "modpack", "Parsing modpack...");
+        }
+    }
+
+    // Parse the modpack
+    let info = if source == "modrinth" {
+        crate::utils::modpack::parse_mrpack(&temp_path)
+    } else {
+        crate::utils::modpack::parse_cf_modpack(&temp_path)
+    }
+    .map_err(|e| e.to_string())?;
+
+    // Create instance
+    let instance = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let display_name = if name.len() > 60 { &name[..60] } else { &name };
+        db::instances::create_instance(
+            &db,
+            db::instances::CreateInstanceParams {
+                name: display_name.to_string(),
+                game_version: info.game_version.clone(),
+                loader: info.loader.clone(),
+                loader_version: Some(info.loader_version.clone()),
+                icon: None,
+                java_args: None,
+                allocated_memory_mb: 4096,
+            },
+        )
+        .map_err(|e| e.to_string())?
+    };
+
+    let instance_dir = crate::utils::paths::instances_dir().join(&instance.id);
+
+    // Emit progress: installing
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(
+                app,
+                &task_id,
+                "modpack",
+                &format!("Installing {} mods...", info.file_count),
+            );
+        }
+    }
+
+    // Install modpack files
+    if source == "modrinth" {
+        crate::utils::modpack::install_mrpack(&temp_path, &instance_dir, &state.http)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        let (_info, cf_files) =
+            crate::utils::modpack::install_cf_modpack(&temp_path, &instance_dir)
+                .await
+                .map_err(|e| e.to_string())?;
+
+        // Download CurseForge mods via API
+        let api_key = {
+            let db = state.db.lock().map_err(|e| e.to_string())?;
+            db::settings::get_curseforge_api_key(&db)
+                .map_err(|e| e.to_string())?
+                .unwrap_or_default()
+        };
+
+        if !api_key.is_empty() {
+            let mods_dir = instance_dir.join("mods");
+            std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+            for cf_file in &cf_files {
+                if let Ok(Some(url)) =
+                    curseforge::get_file_download_url(&api_key, cf_file.project_id, cf_file.file_id)
+                        .await
+                {
+                    let filename = url.rsplit('/').next().unwrap_or("mod.jar");
+                    let dest = mods_dir.join(filename);
+                    let _ = minecraft::download_file(Some(&state.http), &url, &dest).await;
+                }
+            }
+        }
+    }
+
+    // Emit progress: installing loader
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::phase_start(
+                app,
+                &task_id,
+                "loader",
+                &format!("Installing {} loader...", info.loader),
+            );
+        }
+    }
+
+    // Install the mod loader
+    let base_dir = crate::utils::paths::data_dir();
+    if info.loader != "vanilla" && !info.loader_version.is_empty() {
+        let result = match info.loader.as_str() {
+            "fabric" => {
+                loaders::fabric::install(&base_dir, &info.game_version, &info.loader_version).await
+            }
+            "quilt" => {
+                loaders::quilt::install(&base_dir, &info.game_version, &info.loader_version).await
+            }
+            "forge" => {
+                loaders::forge::install(&base_dir, &info.game_version, &info.loader_version).await
+            }
+            "neoforge" => {
+                loaders::neoforge::install(&base_dir, &info.game_version, &info.loader_version)
+                    .await
+            }
+            _ => Ok(String::new()),
+        };
+        if let Err(e) = result {
+            log::warn!("Loader install warning: {}", e);
+        }
+    }
+
+    // Clean up temp file
+    let _ = std::fs::remove_file(&temp_path);
+
+    // Emit completion
+    {
+        let handle_guard = state.app_handle.lock().map_err(|e| e.to_string())?;
+        if let Some(app) = handle_guard.as_ref() {
+            progress::complete(app, &task_id, &format!("{} installed successfully!", name));
+        }
+    }
+
+    Ok(InstanceListItem {
+        id: instance.id,
+        name: instance.name,
+        game_version: instance.game_version,
+        loader: instance.loader,
+        loader_version: instance.loader_version,
+        icon: instance.icon,
+        created_at: instance.created_at,
+        last_played: instance.last_played,
+        play_time_secs: instance.play_time_secs,
+        allocated_memory_mb: instance.allocated_memory_mb,
+    })
+}
+
+// ── Resource Packs & Shaders ───────────────────────────────────
+
+#[derive(Serialize)]
+pub struct InstalledPackInfo {
+    pub file_name: String,
+    pub enabled: bool,
+}
+
+/// List installed resource packs or shader packs for an instance.
+/// `pack_type` is "resourcepacks" or "shaderpacks".
+#[tauri::command]
+pub fn list_installed_packs(
+    instance_id: String,
+    pack_type: String,
+) -> Result<Vec<InstalledPackInfo>, String> {
+    let dir = match pack_type.as_str() {
+        "resourcepacks" | "shaderpacks" => crate::utils::paths::instances_dir()
+            .join(&instance_id)
+            .join(&pack_type),
+        _ => return Err(format!("Invalid pack type: {}", pack_type)),
+    };
+
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let entries: Vec<InstalledPackInfo> = std::fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let name = entry.file_name().to_string_lossy().to_string();
+            // Skip directories and hidden files
+            if entry.path().is_dir() || name.starts_with('.') {
+                return None;
+            }
+            let enabled = !name.ends_with(".disabled");
+            Some(InstalledPackInfo {
+                file_name: name,
+                enabled,
+            })
+        })
+        .collect();
+
+    Ok(entries)
+}
+
+/// Toggle a resource pack or shader pack enabled/disabled.
+#[tauri::command]
+pub fn toggle_pack(
+    instance_id: String,
+    pack_type: String,
+    file_name: String,
+) -> Result<bool, String> {
+    let dir = match pack_type.as_str() {
+        "resourcepacks" | "shaderpacks" => crate::utils::paths::instances_dir()
+            .join(&instance_id)
+            .join(&pack_type),
+        _ => return Err(format!("Invalid pack type: {}", pack_type)),
+    };
+
+    let current_path = dir.join(&file_name);
+    let is_disabled = file_name.ends_with(".disabled");
+
+    let (new_name, new_enabled) = if is_disabled {
+        (file_name.replace(".disabled", ""), true)
+    } else {
+        (format!("{}.disabled", file_name), false)
+    };
+
+    let new_path = dir.join(&new_name);
+
+    if current_path.exists() {
+        std::fs::rename(&current_path, &new_path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(new_enabled)
+}
+
+/// Delete a resource pack or shader pack.
+#[tauri::command]
+pub fn delete_pack(
+    instance_id: String,
+    pack_type: String,
+    file_name: String,
+) -> Result<(), String> {
+    let path = match pack_type.as_str() {
+        "resourcepacks" | "shaderpacks" => crate::utils::paths::instances_dir()
+            .join(&instance_id)
+            .join(&pack_type)
+            .join(&file_name),
+        _ => return Err(format!("Invalid pack type: {}", pack_type)),
+    };
+
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 // ── Offline Launch ──────────────────────────────────────────────

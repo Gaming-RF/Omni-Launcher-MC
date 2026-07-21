@@ -19,6 +19,7 @@ import type {
   InstalledModInfo,
   ModSearchResult,
   LoaderVersionInfo,
+  ModUpdateInfo,
 } from "../lib/tauri";
 import {
   getInstanceMods,
@@ -35,14 +36,16 @@ import {
   installForgeLoader,
   installNeoForgeLoader,
   isInstanceRunning,
+  checkModUpdates,
 } from "../lib/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useNavigate } from "react-router-dom";
 import { useInstancesStore } from "../stores/instances";
 import { useActiveAccount } from "../hooks/useActiveAccount";
 import { GameConsole } from "../components/instance/GameConsole";
+import { PacksTab } from "../components/instance/PacksTab";
 
-type Tab = "mods" | "loader" | "settings" | "console";
+type Tab = "mods" | "resourcepacks" | "shaders" | "loader" | "settings" | "console";
 
 interface Props {
   instance: InstanceListItem;
@@ -113,22 +116,24 @@ export function InstanceDetail({ instance, onBack }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-700">
-        {(["mods", "loader", "settings", "console"] as Tab[]).map((t) => (
+      <div className="flex gap-1 border-b border-slate-700 overflow-x-auto">
+        {(["mods", "resourcepacks", "shaders", "loader", "settings", "console"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors relative ${
+            className={`px-4 py-2 text-sm font-medium capitalize transition-colors relative whitespace-nowrap ${
               tab === t
                 ? "text-white border-b-2 border-blue-500"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
             {t === "mods" && <Puzzle size={14} className="inline mr-1.5" />}
+            {t === "resourcepacks" && <Package size={14} className="inline mr-1.5" />}
+            {t === "shaders" && <Package size={14} className="inline mr-1.5" />}
             {t === "loader" && <Package size={14} className="inline mr-1.5" />}
             {t === "settings" && <Settings size={14} className="inline mr-1.5" />}
             {t === "console" && <Terminal size={14} className="inline mr-1.5" />}
-            {t}
+            {t === "resourcepacks" ? "Resources" : t === "shaders" ? "Shaders" : t}
             {t === "console" && isRunning && (
               <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
@@ -141,6 +146,8 @@ export function InstanceDetail({ instance, onBack }: Props) {
 
       {/* Tab Content */}
       {tab === "mods" && <ModsTab instance={instance} />}
+      {tab === "resourcepacks" && <PacksTab instanceId={instance.id} packType="resourcepacks" />}
+      {tab === "shaders" && <PacksTab instanceId={instance.id} packType="shaderpacks" />}
       {tab === "loader" && <LoaderTab instance={instance} />}
       {tab === "settings" && <SettingsTab instance={instance} />}
       {tab === "console" && <GameConsole instanceId={instance.id} />}
@@ -157,6 +164,8 @@ function ModsTab({ instance }: { instance: InstanceListItem }) {
   const [searchResults, setSearchResults] = useState<ModSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [updates, setUpdates] = useState<ModUpdateInfo[]>([]);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
 
   const fetchMods = useCallback(async () => {
     setLoading(true);
@@ -172,6 +181,17 @@ function ModsTab({ instance }: { instance: InstanceListItem }) {
   useEffect(() => {
     fetchMods();
   }, [fetchMods]);
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true);
+    try {
+      const result = await checkModUpdates(instance.id);
+      setUpdates(result.filter((u) => u.update_available));
+    } catch (err) {
+      console.error("Update check failed:", err);
+    }
+    setCheckingUpdates(false);
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -222,6 +242,57 @@ function ModsTab({ instance }: { instance: InstanceListItem }) {
 
   return (
     <div className="space-y-4">
+      {/* Check for updates button */}
+      {mods.length > 0 && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleCheckUpdates}
+            disabled={checkingUpdates}
+            className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+          >
+            {checkingUpdates ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Download size={12} />
+            )}
+            Check for updates
+          </button>
+          {updates.length > 0 && (
+            <span className="text-xs text-amber-400">
+              {updates.length} update{updates.length !== 1 ? "s" : ""} available
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Update banner */}
+      {updates.length > 0 && (
+        <div className="bg-amber-900/20 border border-amber-800 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-medium text-amber-400 mb-2">Available Updates</p>
+          {updates.map((u) => (
+            <div
+              key={u.mod_id}
+              className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2"
+            >
+              <div className="min-w-0">
+                <p className="text-sm text-white font-medium truncate">{u.mod_name}</p>
+                <p className="text-xs text-slate-400">
+                  {u.installed_version} → {u.latest_version}
+                </p>
+              </div>
+              <a
+                href={u.latest_file_url || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-400 hover:text-blue-300 shrink-0 ml-3"
+              >
+                Download
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Search to install */}
       <div className="flex gap-2">
         <div className="relative flex-1">

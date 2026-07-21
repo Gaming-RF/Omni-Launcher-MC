@@ -8,11 +8,22 @@ import {
   X,
   CheckCircle,
   AlertCircle,
+  Compass,
 } from "lucide-react";
-import type { ModSearchResult, InstanceListItem } from "../lib/tauri";
-import { modrinthSearch, curseforgeSearch, getInstances, installMod } from "../lib/tauri";
+import type { ModSearchResult, InstanceListItem, ModpackSearchResult } from "../lib/tauri";
+import {
+  modrinthSearch,
+  curseforgeSearch,
+  getInstances,
+  installMod,
+  searchModpacksModrinth,
+  searchModpacksCurseforge,
+  getModpackVersionsModrinth,
+  downloadAndInstallModpack,
+} from "../lib/tauri";
 
 type Source = "modrinth" | "curseforge" | "all";
+type Tab = "mods" | "modpacks";
 
 interface InstallState {
   mod: ModSearchResult;
@@ -20,15 +31,24 @@ interface InstallState {
   message?: string;
 }
 
+interface ModpackInstallState {
+  modpack: ModpackSearchResult;
+  status: "confirm" | "installing" | "done" | "error";
+  message?: string;
+}
+
 export function Discover() {
+  const [tab, setTab] = useState<Tab>("mods");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ModSearchResult[]>([]);
+  const [modpackResults, setModpackResults] = useState<ModpackSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState<Source>("all");
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [instances, setInstances] = useState<InstanceListItem[]>([]);
   const [installState, setInstallState] = useState<InstallState | null>(null);
+  const [modpackInstallState, setModpackInstallState] = useState<ModpackInstallState | null>(null);
 
   // Load instances on mount
   useEffect(() => {
@@ -42,39 +62,70 @@ export function Discover() {
     setHasSearched(true);
 
     try {
-      let allResults: ModSearchResult[] = [];
+      if (tab === "mods") {
+        let allResults: ModSearchResult[] = [];
 
-      if (source === "all" || source === "modrinth") {
-        try {
-          const mr = await modrinthSearch(query);
-          allResults = [...allResults, ...mr];
-        } catch (err) {
-          console.error("Modrinth search error:", err);
-        }
-      }
-
-      if (source === "all" || source === "curseforge") {
-        try {
-          const cf = await curseforgeSearch(query);
-          allResults = [...allResults, ...cf];
-        } catch (err) {
-          const msg = String(err);
-          if (msg.includes("API key")) {
-            setError("CurseForge requires an API key. Add one in Settings.");
-          } else {
-            console.error("CurseForge search error:", err);
+        if (source === "all" || source === "modrinth") {
+          try {
+            const mr = await modrinthSearch(query);
+            allResults = [...allResults, ...mr];
+          } catch (err) {
+            console.error("Modrinth search error:", err);
           }
         }
-      }
 
-      allResults.sort((a, b) => b.downloads - a.downloads);
-      setResults(allResults);
+        if (source === "all" || source === "curseforge") {
+          try {
+            const cf = await curseforgeSearch(query);
+            allResults = [...allResults, ...cf];
+          } catch (err) {
+            const msg = String(err);
+            if (msg.includes("API key")) {
+              setError("CurseForge requires an API key. Add one in Settings.");
+            } else {
+              console.error("CurseForge search error:", err);
+            }
+          }
+        }
+
+        allResults.sort((a, b) => b.downloads - a.downloads);
+        setResults(allResults);
+      } else {
+        // Modpack search
+        let allModpacks: ModpackSearchResult[] = [];
+
+        if (source === "all" || source === "modrinth") {
+          try {
+            const mr = await searchModpacksModrinth(query);
+            allModpacks = [...allModpacks, ...mr];
+          } catch (err) {
+            console.error("Modrinth modpack search error:", err);
+          }
+        }
+
+        if (source === "all" || source === "curseforge") {
+          try {
+            const cf = await searchModpacksCurseforge(query);
+            allModpacks = [...allModpacks, ...cf];
+          } catch (err) {
+            const msg = String(err);
+            if (msg.includes("API key")) {
+              // Silently skip CurseForge if no API key
+            } else {
+              console.error("CurseForge modpack search error:", err);
+            }
+          }
+        }
+
+        allModpacks.sort((a, b) => b.downloads - a.downloads);
+        setModpackResults(allModpacks);
+      }
     } catch (err) {
       setError(String(err));
     } finally {
       setLoading(false);
     }
-  }, [query, source]);
+  }, [query, source, tab]);
 
   const handleInstallClick = (mod: ModSearchResult) => {
     setInstallState({ mod, status: "picking" });
@@ -103,6 +154,49 @@ export function Discover() {
     }
   };
 
+  const handleModpackInstall = (modpack: ModpackSearchResult) => {
+    setModpackInstallState({ modpack, status: "confirm" });
+  };
+
+  const handleModpackInstallConfirm = async () => {
+    if (!modpackInstallState) return;
+    const { modpack } = modpackInstallState;
+    setModpackInstallState({ modpack, status: "installing" });
+
+    try {
+      // Get the download URL — for Modrinth, fetch versions and pick first; for CurseForge, use the modpack info
+      let downloadUrl: string;
+
+      if (modpack.source === "modrinth") {
+        const versions = await getModpackVersionsModrinth(modpack.project_id);
+        const fileUrl = versions[0]?.file_url;
+        if (!fileUrl) throw new Error("No downloadable file found for this modpack");
+        downloadUrl = fileUrl;
+      } else {
+        // CurseForge — for now we require the CF file download URL
+        throw new Error(
+          "CurseForge modpack direct install is not yet supported. Try Modrinth modpacks!"
+        );
+      }
+
+      await downloadAndInstallModpack(downloadUrl, modpack.source, modpack.title);
+      setModpackInstallState({
+        modpack,
+        status: "done",
+        message: `${modpack.title} installed as a new instance!`,
+      });
+      // Refresh instances
+      getInstances().then(setInstances).catch(console.error);
+      setTimeout(() => setModpackInstallState(null), 4000);
+    } catch (err) {
+      setModpackInstallState({
+        modpack,
+        status: "error",
+        message: String(err),
+      });
+    }
+  };
+
   const formatDownloads = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -124,15 +218,55 @@ export function Discover() {
     );
   };
 
+  const currentResults = tab === "mods" ? results : modpackResults;
+  const noResults = hasSearched && currentResults.length === 0 && !loading;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Discover Mods</h1>
+        <h1 className="text-2xl font-bold text-white">Discover</h1>
         <p className="text-slate-400 mt-1">
-          Search and install from Modrinth &amp; CurseForge — all in one place
+          Search and install mods &amp; modpacks from Modrinth &amp; CurseForge
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-800 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => {
+            setTab("mods");
+            setHasSearched(false);
+            setResults([]);
+            setModpackResults([]);
+          }}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "mods"
+              ? "bg-blue-600 text-white"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Package size={14} className="inline mr-1.5 -mt-0.5" />
+          Mods
+        </button>
+        <button
+          onClick={() => {
+            setTab("modpacks");
+            setHasSearched(false);
+            setResults([]);
+            setModpackResults([]);
+          }}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            tab === "modpacks"
+              ? "bg-blue-600 text-white"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <Compass size={14} className="inline mr-1.5 -mt-0.5" />
+          Modpacks
+        </button>
+      </div>
+
+      {/* Search bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -141,7 +275,11 @@ export function Discover() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            placeholder="Search for mods, modpacks, shaders..."
+            placeholder={
+              tab === "mods"
+                ? "Search for mods..."
+                : "Search for modpacks..."
+            }
             className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -170,19 +308,27 @@ export function Discover() {
         </div>
       )}
 
-      {!hasSearched && results.length === 0 ? (
+      {/* Empty state */}
+      {!hasSearched && currentResults.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <Globe size={48} className="mb-4 text-slate-600" />
-          <p className="text-lg font-medium text-slate-400">Search for mods</p>
-          <p className="text-sm mt-1">Find mods from Modrinth and CurseForge in one place</p>
+          <p className="text-lg font-medium text-slate-400">
+            {tab === "mods" ? "Search for mods" : "Search for modpacks"}
+          </p>
+          <p className="text-sm mt-1">
+            {tab === "mods"
+              ? "Find mods from Modrinth and CurseForge in one place"
+              : "Browse curated modpacks and install them in one click"}
+          </p>
         </div>
-      ) : results.length === 0 && !loading ? (
+      ) : noResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <Package size={48} className="mb-4 text-slate-600" />
           <p className="text-lg font-medium text-slate-400">No results found</p>
           <p className="text-sm mt-1">Try different keywords or switch sources</p>
         </div>
-      ) : (
+      ) : tab === "mods" ? (
+        /* ── Mods list ── */
         <div className="space-y-3">
           {results.map((mod) => (
             <div
@@ -239,9 +385,73 @@ export function Discover() {
             </div>
           ))}
         </div>
+      ) : (
+        /* ── Modpacks list ── */
+        <div className="space-y-3">
+          {modpackResults.map((mp) => (
+            <div
+              key={`${mp.source}-${mp.project_id}`}
+              className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors"
+            >
+              <div className="flex items-start gap-4">
+                {mp.icon_url ? (
+                  <img
+                    src={mp.icon_url}
+                    alt={mp.title}
+                    className="w-14 h-14 rounded-lg object-cover bg-slate-700"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-slate-700 flex items-center justify-center">
+                    <Compass size={28} className="text-slate-500" />
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-white font-semibold">{mp.title}</h3>
+                    {sourceBadge(mp.source)}
+                  </div>
+                  <p className="text-sm text-slate-400 mt-1 line-clamp-2">{mp.description}</p>
+                  <div className="flex items-center gap-4 mt-2 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-slate-500">
+                      <Download size={12} />
+                      {formatDownloads(mp.downloads)}
+                    </span>
+                    {mp.categories.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {mp.categories.slice(0, 4).map((cat: string) => (
+                          <span
+                            key={cat}
+                            className="px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded text-xs"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {mp.game_versions.length > 0 && (
+                      <span className="text-xs text-slate-500">
+                        MC {mp.game_versions[0]}
+                        {mp.game_versions.length > 1 && ` +${mp.game_versions.length - 1}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleModpackInstall(mp)}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shrink-0"
+                >
+                  <Download size={14} />
+                  Install
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* Instance picker modal */}
+      {/* Instance picker modal (for mods) */}
       {installState && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4 p-6">
@@ -308,6 +518,104 @@ export function Discover() {
                 </p>
                 <button
                   onClick={() => setInstallState(null)}
+                  className="mt-4 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modpack install confirmation modal */}
+      {modpackInstallState && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md mx-4 p-6">
+            {modpackInstallState.status === "confirm" && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">
+                    Install Modpack
+                  </h2>
+                  <button
+                    onClick={() => setModpackInstallState(null)}
+                    className="text-slate-400 hover:text-white"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 mb-4">
+                  {modpackInstallState.modpack.icon_url ? (
+                    <img
+                      src={modpackInstallState.modpack.icon_url}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-slate-700 flex items-center justify-center">
+                      <Compass size={24} className="text-slate-500" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-white font-medium">{modpackInstallState.modpack.title}</p>
+                    <p className="text-xs text-slate-400">
+                      {formatDownloads(modpackInstallState.modpack.downloads)} downloads ·{" "}
+                      {sourceBadge(modpackInstallState.modpack.source)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-400 mb-6">
+                  This will create a new instance with all the mods and configuration from this
+                  modpack. Continue?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setModpackInstallState(null)}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleModpackInstallConfirm}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Download size={14} />
+                    Install
+                  </button>
+                </div>
+              </>
+            )}
+
+            {modpackInstallState.status === "installing" && (
+              <div className="flex flex-col items-center py-8">
+                <Loader2 size={32} className="animate-spin text-emerald-400 mb-4" />
+                <p className="text-white font-medium">
+                  Installing {modpackInstallState.modpack.title}...
+                </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Downloading, parsing, and setting up the modpack
+                </p>
+              </div>
+            )}
+
+            {modpackInstallState.status === "done" && (
+              <div className="flex flex-col items-center py-8">
+                <CheckCircle size={32} className="text-green-400 mb-4" />
+                <p className="text-white font-medium">{modpackInstallState.message}</p>
+                <p className="text-sm text-slate-400 mt-1">Ready to play!</p>
+              </div>
+            )}
+
+            {modpackInstallState.status === "error" && (
+              <div className="flex flex-col items-center py-8">
+                <AlertCircle size={32} className="text-red-400 mb-4" />
+                <p className="text-white font-medium">Modpack install failed</p>
+                <p className="text-sm text-red-400 mt-1 text-center max-w-xs">
+                  {modpackInstallState.message}
+                </p>
+                <button
+                  onClick={() => setModpackInstallState(null)}
                   className="mt-4 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm"
                 >
                   Close
