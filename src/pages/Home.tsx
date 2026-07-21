@@ -20,6 +20,7 @@ import { useInstancesStore } from "../stores/instances";
 import { useActiveAccount } from "../hooks/useActiveAccount";
 import type { InstanceListItem } from "../lib/tauri";
 import { InstanceCardSkeleton } from "../components/common/Skeleton";
+import { useI18nStore } from "../stores/i18n";
 
 type SortOption = "last-played" | "name-asc" | "name-desc" | "newest" | "oldest";
 
@@ -41,6 +42,7 @@ export function Home() {
   const launchGameOffline = useInstancesStore((s) => s.launchGameOffline);
   const { hasAccount } = useActiveAccount();
   const navigate = useNavigate();
+  const t = useI18nStore((s) => s.t);
   const [showSignInBanner, setShowSignInBanner] = useState(true);
   const [selectedInstance, setSelectedInstance] = useState<InstanceListItem | null>(null);
   const [shareInstance, setShareInstance] = useState<InstanceListItem | null>(null);
@@ -149,13 +151,13 @@ export function Home() {
         <div className="flex items-center gap-3 bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-sm">
           <User size={18} className="text-emerald-400 flex-shrink-0" />
           <span className="text-slate-300">
-            Offline mode — click <strong>Play</strong> on any instance to launch with a username
+            {t("home.offlineTip")}
           </span>
           <button
             onClick={() => navigate("/settings")}
             className="ml-auto bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
           >
-            Sign in with Microsoft
+            {t("home.signIn")}
           </button>
           <button
             onClick={() => setShowSignInBanner(false)}
@@ -169,14 +171,14 @@ export function Home() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            Welcome{hasAccount ? " back" : ""}
+            {hasAccount ? t("home.welcomeBack") : t("home.welcome")}
           </h1>
           <p className="text-slate-400 mt-1">
             {instances.length === 0
-              ? "Create your first instance to get started"
+              ? t("home.noInstancesDesc")
               : isFiltered
-                ? `${filteredSorted.length} of ${instances.length} instance${instances.length !== 1 ? "s" : ""}`
-                : `${instances.length} instance${instances.length !== 1 ? "s" : ""}`}
+                ? `${filteredSorted.length} / ${instances.length}`
+                : `${instances.length}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -185,7 +187,7 @@ export function Home() {
             className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
           >
             <Download size={14} />
-            Import
+            {t("common.import")}
           </button>
           <InstanceCreator />
         </div>
@@ -203,9 +205,9 @@ export function Home() {
           <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
             <Gamepad2 size={28} className="text-slate-600" />
           </div>
-          <p className="text-lg font-medium text-slate-400">No instances yet</p>
+          <p className="text-lg font-medium text-slate-400">{t("home.noInstances")}</p>
           <p className="text-sm mt-1 mb-4">
-            Create your first instance to start playing Minecraft
+            {t("home.noInstancesDesc")}
           </p>
           <InstanceCreator />
         </div>
@@ -224,7 +226,7 @@ export function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search instances… (Ctrl+K)"
+                placeholder={t("home.search")}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 placeholder:text-slate-500"
               />
             </div>
@@ -273,10 +275,10 @@ export function Home() {
             <div className="flex flex-col items-center justify-center py-16 text-slate-500">
               <Search size={24} className="mb-2 text-slate-600" />
               <p className="text-sm font-medium text-slate-400">
-                No instances match your filters
+                {t("home.noFilterMatch")}
               </p>
               <p className="text-xs mt-1">
-                Try adjusting your search or filter criteria
+                {t("home.adjustFilters")}
               </p>
             </div>
           ) : (
@@ -376,9 +378,9 @@ export function Home() {
     {offlineDialog && (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-sm mx-4 p-6">
-          <h2 className="text-lg font-semibold text-white mb-2">Play Offline</h2>
+          <h2 className="text-lg font-semibold text-white mb-2">{t("home.offlineTitle")}</h2>
           <p className="text-sm text-slate-400 mb-4">
-            Enter a username to launch in offline mode. No Microsoft account needed.
+            {t("home.offlineDesc")}
           </p>
           <input
             type="text"
@@ -391,7 +393,7 @@ export function Home() {
                 setOfflineDialog(null);
               }
             }}
-            placeholder="Username"
+            placeholder={t("home.offlineUsername")}
             autoFocus
             className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 mb-4"
           />
@@ -400,7 +402,7 @@ export function Home() {
               onClick={() => setOfflineDialog(null)}
               className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={() => {
@@ -413,7 +415,7 @@ export function Home() {
               disabled={!offlineUsername.trim()}
               className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              Launch
+              {t("home.launch")}
             </button>
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   getModpackVersionsModrinth,
   downloadAndInstallModpack,
 } from "../lib/tauri";
+import { useI18nStore } from "../stores/i18n";
 
 type Source = "modrinth" | "curseforge" | "all";
 type Tab = "mods" | "modpacks";
@@ -49,6 +50,7 @@ export function Discover() {
   const [instances, setInstances] = useState<InstanceListItem[]>([]);
   const [installState, setInstallState] = useState<InstallState | null>(null);
   const [modpackInstallState, setModpackInstallState] = useState<ModpackInstallState | null>(null);
+  const t = useI18nStore((s) => s.t);
 
   // Load instances on mount
   useEffect(() => {
@@ -224,9 +226,9 @@ export function Discover() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Discover</h1>
+        <h1 className="text-2xl font-bold text-white">{t("discover.title")}</h1>
         <p className="text-slate-400 mt-1">
-          Search and install mods &amp; modpacks from Modrinth &amp; CurseForge
+          {t("discover.subtitle")}
         </p>
       </div>
 
@@ -246,7 +248,7 @@ export function Discover() {
           }`}
         >
           <Package size={14} className="inline mr-1.5 -mt-0.5" />
-          Mods
+          {t("discover.mods")}
         </button>
         <button
           onClick={() => {
@@ -262,7 +264,7 @@ export function Discover() {
           }`}
         >
           <Compass size={14} className="inline mr-1.5 -mt-0.5" />
-          Modpacks
+          {t("discover.modpacks")}
         </button>
       </div>
 
@@ -324,7 +326,7 @@ export function Discover() {
       ) : noResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <Package size={48} className="mb-4 text-slate-600" />
-          <p className="text-lg font-medium text-slate-400">No results found</p>
+          <p className="text-lg font-medium text-slate-400">{t("discover.noResults")}</p>
           <p className="text-sm mt-1">Try different keywords or switch sources</p>
         </div>
       ) : tab === "mods" ? (

@@ -41,6 +41,7 @@ import {
 import { listen } from "@tauri-apps/api/event";
 import { useNavigate } from "react-router-dom";
 import { useInstancesStore } from "../stores/instances";
+import { useI18nStore } from "../stores/i18n";
 import { useActiveAccount } from "../hooks/useActiveAccount";
 import { GameConsole } from "../components/instance/GameConsole";
 import { PacksTab } from "../components/instance/PacksTab";
@@ -55,6 +56,7 @@ interface Props {
 export function InstanceDetail({ instance, onBack }: Props) {
   const [tab, setTab] = useState<Tab>("mods");
   const launchGame = useInstancesStore((s) => s.launchGame);
+  const t = useI18nStore((s) => s.t);
   const [isRunning, setIsRunning] = useState(false);
 
   // Check initial running state and subscribe to game events
@@ -117,24 +119,30 @@ export function InstanceDetail({ instance, onBack }: Props) {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-700 overflow-x-auto">
-        {(["mods", "resourcepacks", "shaders", "loader", "settings", "console"] as Tab[]).map((t) => (
+        {(["mods", "resourcepacks", "shaders", "loader", "settings", "console"] as Tab[]).map((tabId) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabId}
+            onClick={() => setTab(tabId)}
             className={`px-4 py-2 text-sm font-medium capitalize transition-colors relative whitespace-nowrap ${
-              tab === t
+              tab === tabId
                 ? "text-white border-b-2 border-blue-500"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
-            {t === "mods" && <Puzzle size={14} className="inline mr-1.5" />}
-            {t === "resourcepacks" && <Package size={14} className="inline mr-1.5" />}
-            {t === "shaders" && <Package size={14} className="inline mr-1.5" />}
-            {t === "loader" && <Package size={14} className="inline mr-1.5" />}
-            {t === "settings" && <Settings size={14} className="inline mr-1.5" />}
-            {t === "console" && <Terminal size={14} className="inline mr-1.5" />}
-            {t === "resourcepacks" ? "Resources" : t === "shaders" ? "Shaders" : t}
-            {t === "console" && isRunning && (
+            {tabId === "mods" && <Puzzle size={14} className="inline mr-1.5" />}
+            {tabId === "resourcepacks" && <Package size={14} className="inline mr-1.5" />}
+            {tabId === "shaders" && <Package size={14} className="inline mr-1.5" />}
+            {tabId === "loader" && <Package size={14} className="inline mr-1.5" />}
+            {tabId === "settings" && <Settings size={14} className="inline mr-1.5" />}
+            {tabId === "console" && <Terminal size={14} className="inline mr-1.5" />}
+            {tabId === "mods" ? t("instance.mods")
+              : tabId === "resourcepacks" ? t("instance.resources")
+              : tabId === "shaders" ? t("instance.shaders")
+              : tabId === "loader" ? t("instance.loader")
+              : tabId === "settings" ? t("instance.settings")
+              : tabId === "console" ? t("instance.console")
+              : tabId}
+            {tabId === "console" && isRunning && (
               <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
                 Running
