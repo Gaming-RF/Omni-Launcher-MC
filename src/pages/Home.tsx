@@ -58,27 +58,6 @@ export function Home() {
   const [sortBy, setSortBy] = useState<SortOption>("last-played");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Listen for Ctrl+K focus-search custom event
-  useEffect(() => {
-    const onFocus = () => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    };
-    window.addEventListener("focus-search", onFocus);
-    return () => window.removeEventListener("focus-search", onFocus);
-  }, []);
-
-  // Listen for launch-instance custom event (launch first visible instance)
-  useEffect(() => {
-    const onLaunch = () => {
-      if (filteredSorted.length > 0) {
-        launchGame(filteredSorted[0].id);
-      }
-    };
-    window.addEventListener("launch-instance", onLaunch);
-    return () => window.removeEventListener("launch-instance", onLaunch);
-  });
-
   // Filter and sort
   const filteredSorted = useMemo(() => {
     let result = [...instances];
@@ -121,6 +100,27 @@ export function Home() {
 
     return result;
   }, [instances, searchQuery, loaderFilter, sortBy]);
+
+  // Listen for Ctrl+K focus-search custom event
+  useEffect(() => {
+    const onFocus = () => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("focus-search", onFocus);
+    return () => window.removeEventListener("focus-search", onFocus);
+  }, []);
+
+  // Listen for launch-instance custom event (launch first visible instance)
+  useEffect(() => {
+    const onLaunch = () => {
+      if (filteredSorted.length > 0) {
+        launchGame(filteredSorted[0].id);
+      }
+    };
+    window.addEventListener("launch-instance", onLaunch);
+    return () => window.removeEventListener("launch-instance", onLaunch);
+  }, [filteredSorted, launchGame]);
 
   // If an instance is selected, show the detail view
   if (selectedInstance) {
