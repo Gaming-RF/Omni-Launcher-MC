@@ -86,5 +86,17 @@ pub fn run_migrations(db: &Connection) -> Result<()> {
         }
     }
 
+    // Add instance hooks columns.
+    for col in &[
+        ("pre_launch_cmd", "TEXT"),
+        ("post_exit_cmd", "TEXT"),
+        ("hook_env_vars", "TEXT"),
+    ] {
+        let sql = format!("ALTER TABLE instances ADD COLUMN {} {}", col.0, col.1);
+        if db.execute_batch(&sql).is_ok() {
+            log::info!("Added {} column to instances table", col.0);
+        }
+    }
+
     Ok(())
 }

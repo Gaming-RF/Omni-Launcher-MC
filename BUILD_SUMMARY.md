@@ -13,25 +13,63 @@ Open-source, cross-platform Minecraft launcher built with Tauri 2.x (Rust backen
 ```
 src-tauri/src/
 ├── api/            # HTTP clients (Modrinth, CurseForge, Minecraft, Fabric, Forge, etc.)
-├── commands/       # Tauri IPC commands (56 total)
-│   ├── auth.rs     # Microsoft OAuth + offline accounts (5 commands)
+├── commands/       # Tauri IPC commands (80 total)
+│   ├── auth.rs     # Microsoft OAuth + offline accounts (6 commands)
 │   ├── instances.rs # CRUD + settings + sharing (9 commands)
 │   ├── loaders.rs  # Fabric/Quilt/Forge/NeoForge + mod management (20 commands)
 │   ├── minecraft.rs # Launch, search, modpacks, packs (15 commands)
 │   ├── java.rs     # Auto Java install (3 commands)
-│   └── process.rs  # Game process monitoring (4 commands)
+│   ├── process.rs  # Game process monitoring (4 commands)
+│   └── launcher.rs # Launcher import + profile export (24 commands)
 ├── db/             # SQLite via rusqlite (accounts, instances, mods, settings)
 └── utils/          # Paths, launcher, progress events, modpack parsing, process manager
 
 src/
-├── pages/          # Home, Discover, InstanceDetail, Settings
-├── components/     # InstanceCreator, GameConsole, ModsTab, PacksTab, ShareDialog, Skeleton, PageTransition
+├── pages/          # Home, Discover, InstanceDetail, Settings, Import
+├── components/     # InstanceCreator, GameConsole, ModsTab, PacksTab, ShareDialog, Skeleton, PageTransition, WorldsTab, InstanceHooks
 ├── stores/         # Zustand stores (auth, instances, i18n)
 ├── hooks/          # useActiveAccount
 └── lib/            # tauri.ts (IPC wrappers), i18n.ts (8 locales)
 ```
 
 ## Features Completed (v0.2.0)
+
+### 9. Launcher Import (MultiMC/PrismLauncher/ATLauncher)
+- `scan_launcher_instances` command: detects installed launchers, scans their instance directories
+- Parses `instance.cfg` (MultiMC/Prism), `instance.json` (ATLauncher) to extract name, game version, loader
+- `import_launcher_instance`: copies instance, parses installed mod JARs, inserts into DB
+- Import page with launcher type tabs, instance selection checkboxes, batch import
+- Progress bar during import, success/error reporting per instance
+- Added `Download` icon to sidebar nav linking to `/import`
+
+### 10. Profile Export (`.zip`)
+- `export_instance_profile` command: creates portable `.zip` with mods, config, resourcepacks, shaderpacks, saves
+- `profiles/` directory created in app data for exports
+- Export button in InstanceDetail header (Download icon)
+- Auto-names file: `{InstanceName}_v{Version}.zip`
+
+### 11. Instance Hooks (Pre/Post Launch Commands)
+- `update_instance_hooks` command: stores pre/post launch shell commands per instance
+- InstanceHooks component: editable text fields for pre_launch, post_launch, post_exit hooks
+- "Hooks" tab in InstanceDetail
+- Hooks stored in `instances` DB table (pre_launch_hook, post_launch_hook, post_exit_hook columns)
+- Migration added for schema upgrade
+
+### 12. World Management
+- `list_worlds` command: scans `saves/` directory, parses `level.dat` for world name, last played, game mode
+- `delete_world` command: recursively removes world directory
+- WorldsTab component: lists worlds with name, game mode, last played date, delete button
+- "Worlds" tab added to InstanceDetail
+
+### 13. Play Time Tracking
+- `increment_play_time` command: adds seconds to instance's `play_time_secs` column
+- `play_time_secs` column added to instances table via migration
+- Auto-increments on game launch (polling via process manager)
+
+### 14. Keyboard Shortcut (Ctrl+K Command Palette)
+- Home page listens for `Ctrl+K` / `Cmd+K` to focus search input
+- Discover page listens for `Ctrl+F` / `Cmd+F` to focus search
+- Prevents default browser behavior
 
 ### 1. Modpack Browsing + One-Click Install
 - Dual-source search: Modrinth + CurseForge modpacks
@@ -85,7 +123,7 @@ src/
 
 ### Database Schema (SQLite)
 - `accounts` — uuid, username, access_token, refresh_token, skin_url, last_used
-- `instances` — id, name, game_version, loader, loader_version, icon, java_args, allocated_memory_mb, created_at, last_played, play_time_secs
+- `instances` — id, name, game_version, loader, loader_version, icon, java_args, allocated_memory_mb, created_at, last_played, play_time_secs, pre_launch_hook, post_launch_hook, post_exit_hook
 - `mods` — id, instance_id, mod_id, name, source, version, file_name, enabled
 - `settings` — key/value store (memory_mb, java_path, curseforge_api_key, theme, locale)
 
@@ -119,7 +157,7 @@ src/
 - **App icons** — currently solid emerald green placeholders. Need proper 32x32, 128x128, icon.ico, icon.png.
 
 ### Code Quality Items
-- **No unit tests** — `cargo test` runs 0 tests. Need tests for modpack parsing, version comparison, crash detection.
+- **No frontend unit tests** — `cargo test` runs 3 Rust tests. Need tests for modpack parsing, version comparison, crash detection.
 - **`java_installations` table** — created in schema but never queried (dead schema).
 - **CurseForge modpack direct install** — throws "not yet supported" error. Modrinth modpacks work fully.
 - **Error handling** — most Rust commands use `.map_err(|e| e.to_string())`. Could use structured error types.
@@ -128,9 +166,10 @@ src/
 - Mod browser could support installing mods directly into instances (currently only modpacks get one-click install)
 - Resource pack/shader download from CurseForge/Modrinth
 - Instance groups/categories
-- Play time tracking (schema exists, not incremented)
 - Settings page could show Java installation status
-- Keyboard shortcuts (Ctrl+K for search is implemented, could add more)
+- More keyboard shortcuts beyond Ctrl+K / Ctrl+F
+- Instance screenshot management (auto-capture, gallery)
+- Modpack creation wizard (select mods → export as modpack)
 
 ## Build & Development
 

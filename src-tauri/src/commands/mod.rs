@@ -1,6 +1,12 @@
 pub mod auth;
+pub mod hooks;
+pub mod import;
 pub mod instances;
 pub mod java;
 pub mod loaders;
+pub mod logs;
 pub mod minecraft;
 pub mod process;
+pub mod shortcuts;
+pub mod skins;
+pub mod worlds;

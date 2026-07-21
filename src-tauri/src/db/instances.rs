@@ -17,6 +17,10 @@ pub struct GameInstance {
     pub notes: Option<String>,
     pub groups: Option<String>,
     pub allocated_memory_mb: i64,
+    pub java_installation_id: Option<String>,
+    pub pre_launch_cmd: Option<String>,
+    pub post_exit_cmd: Option<String>,
+    pub hook_env_vars: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,7 +39,8 @@ pub fn get_all_instances(db: &rusqlite::Connection) -> Result<Vec<GameInstance>>
     let mut stmt = db.prepare(
         "SELECT id, name, game_version, loader, loader_version, icon, created_at, 
          last_played, play_time_secs, java_args, resolution, notes, groups, 
-         allocated_memory_mb FROM instances ORDER BY last_played DESC, created_at DESC",
+         allocated_memory_mb, java_installation_id, pre_launch_cmd, post_exit_cmd, hook_env_vars 
+         FROM instances ORDER BY last_played DESC NULLS LAST, created_at DESC",
     )?;
 
     let instances = stmt
@@ -55,6 +60,10 @@ pub fn get_all_instances(db: &rusqlite::Connection) -> Result<Vec<GameInstance>>
                 notes: row.get(11)?,
                 groups: row.get(12)?,
                 allocated_memory_mb: row.get(13)?,
+                java_installation_id: row.get(14)?,
+                pre_launch_cmd: row.get(15)?,
+                post_exit_cmd: row.get(16)?,
+                hook_env_vars: row.get(17)?,
             })
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -67,7 +76,8 @@ pub fn get_instance(db: &rusqlite::Connection, id: &str) -> Result<Option<GameIn
     let mut stmt = db.prepare(
         "SELECT id, name, game_version, loader, loader_version, icon, created_at, 
          last_played, play_time_secs, java_args, resolution, notes, groups, 
-         allocated_memory_mb FROM instances WHERE id = ?1",
+         allocated_memory_mb, java_installation_id, pre_launch_cmd, post_exit_cmd, hook_env_vars 
+         FROM instances WHERE id = ?1",
     )?;
 
     let mut rows = stmt.query_map([id], |row| {
@@ -86,6 +96,10 @@ pub fn get_instance(db: &rusqlite::Connection, id: &str) -> Result<Option<GameIn
             notes: row.get(11)?,
             groups: row.get(12)?,
             allocated_memory_mb: row.get(13)?,
+            java_installation_id: row.get(14)?,
+            pre_launch_cmd: row.get(15)?,
+            post_exit_cmd: row.get(16)?,
+            hook_env_vars: row.get(17)?,
         })
     })?;
 
@@ -122,21 +136,55 @@ pub fn create_instance(
     )?;
 
     Ok(GameInstance {
-        id,
-        name: params.name,
-        game_version: params.game_version,
-        loader: params.loader,
-        loader_version: params.loader_version,
-        icon: params.icon,
+        id: id.clone(),
+        name: params.name.clone(),
+        game_version: params.game_version.clone(),
+        loader: params.loader.clone(),
+        loader_version: params.loader_version.clone(),
+        icon: params.icon.clone(),
         created_at: now,
         last_played: None,
         play_time_secs: 0,
-        java_args: params.java_args,
+        java_args: params.java_args.clone(),
         resolution: None,
         notes: None,
         groups: None,
         allocated_memory_mb: params.allocated_memory_mb,
+        java_installation_id: None,
+        pre_launch_cmd: None,
+        post_exit_cmd: None,
+        hook_env_vars: None,
     })
+}
+
+/// Insert an existing instance (used by import).
+pub fn insert_instance(db: &rusqlite::Connection, instance: &GameInstance) -> Result<()> {
+    db.execute(
+        "INSERT INTO instances (id, name, game_version, loader, loader_version, icon, 
+         created_at, last_played, play_time_secs, java_args, resolution, notes, groups, 
+         allocated_memory_mb, pre_launch_cmd, post_exit_cmd, hook_env_vars) 
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        rusqlite::params![
+            instance.id,
+            instance.name,
+            instance.game_version,
+            instance.loader,
+            instance.loader_version,
+            instance.icon,
+            instance.created_at,
+            instance.last_played,
+            instance.play_time_secs,
+            instance.java_args,
+            instance.resolution,
+            instance.notes,
+            instance.groups,
+            instance.allocated_memory_mb,
+            instance.pre_launch_cmd,
+            instance.post_exit_cmd,
+            instance.hook_env_vars,
+        ],
+    )?;
+    Ok(())
 }
 
 /// Update an existing instance.

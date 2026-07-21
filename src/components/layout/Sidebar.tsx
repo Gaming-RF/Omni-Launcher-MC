@@ -4,12 +4,14 @@ import {
   Compass,
   Settings,
   User,
+  Download,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/auth";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/discover", icon: Compass, label: "Discover" },
+  { to: "/import", icon: Download, label: "Import" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

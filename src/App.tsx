@@ -5,6 +5,7 @@ import { Home } from "./pages/Home";
 import { Discover } from "./pages/Discover";
 import { Settings } from "./pages/Settings";
 import { InstanceDetailPage } from "./pages/InstanceDetailPage";
+import Import from "./pages/Import";
 import { useAppInit } from "./hooks/useAppInit";
 import { useDownloadProgress } from "./hooks/useDownloadProgress";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/" element={<PageTransition><Home /></PageTransition>} />
           <Route path="/instance/:id" element={<PageTransition><InstanceDetailPage /></PageTransition>} />
           <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
+          <Route path="/import" element={<PageTransition><Import /></PageTransition>} />
           <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
         </Routes>
       </main>

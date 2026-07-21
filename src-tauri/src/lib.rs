@@ -137,6 +137,36 @@ pub fn run() {
             commands::minecraft::list_installed_packs,
             commands::minecraft::toggle_pack,
             commands::minecraft::delete_pack,
+            // Import from other launchers
+            commands::import::scan_launcher_instances,
+            commands::import::import_launcher_instance,
+            // Desktop shortcuts
+            commands::shortcuts::create_desktop_shortcut,
+            commands::shortcuts::get_shortcut_default_dir,
+            // Worlds & servers
+            commands::worlds::get_instance_worlds,
+            commands::worlds::add_server,
+            commands::worlds::edit_server,
+            commands::worlds::remove_server,
+            commands::worlds::ping_server,
+            commands::worlds::delete_world,
+            commands::worlds::rename_world,
+            commands::worlds::backup_world,
+            // Skins
+            commands::skins::get_skin_info,
+            commands::skins::upload_skin,
+            commands::skins::reset_skin,
+            commands::skins::get_capes,
+            // Instance hooks
+            commands::hooks::get_instance_hooks,
+            commands::hooks::update_instance_hooks,
+            // Advanced logs
+            commands::logs::get_log_files,
+            commands::logs::read_log_cursor,
+            commands::logs::read_log_file,
+            commands::logs::delete_log_file,
+            commands::logs::delete_all_logs,
+            commands::logs::get_log_size,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");
