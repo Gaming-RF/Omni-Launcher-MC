@@ -4,6 +4,7 @@ node_modules/
 
 # Build output
 dist/
+dist-packages/
 src-tauri/target/
 src-tauri/gen/
 tsconfig.tsbuildinfo
