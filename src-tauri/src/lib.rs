@@ -171,6 +171,48 @@ pub fn run() {
             commands::logs::delete_log_file,
             commands::logs::delete_all_logs,
             commands::logs::get_log_size,
+            // Instance groups
+            commands::groups::list_groups,
+            commands::groups::create_group,
+            commands::groups::delete_group,
+            commands::groups::rename_group,
+            commands::groups::update_group_color,
+            commands::groups::assign_instance_to_group,
+            commands::groups::remove_instance_from_group,
+            commands::groups::get_group_instances,
+            // Mirror / CDN switching
+            commands::mirrors::list_mirrors,
+            commands::mirrors::get_mirror,
+            commands::mirrors::set_mirror,
+            commands::mirrors::test_mirror,
+            commands::mirrors::test_all_mirrors,
+            commands::mirrors::resolve_download_url,
+            // Instance templates
+            commands::templates::list_templates,
+            commands::templates::list_custom_templates,
+            commands::templates::create_instance_from_template,
+            commands::templates::save_as_template,
+            commands::templates::delete_custom_template,
+            // Modpack export (.mrpack)
+            commands::mrpack_export::export_mrpack,
+            commands::mrpack_export::export_mrpack_to_path,
+            // Resource packs & shaders management
+            commands::resource_packs::list_resource_packs,
+            commands::resource_packs::list_shaders,
+            commands::resource_packs::toggle_resource_pack,
+            commands::resource_packs::toggle_shader,
+            commands::resource_packs::delete_resource_pack,
+            commands::resource_packs::delete_shader,
+            commands::resource_packs::open_resource_packs_folder,
+            commands::resource_packs::open_shaders_folder,
+            // Screenshots
+            commands::screenshots::list_screenshots,
+            commands::screenshots::delete_screenshot,
+            commands::screenshots::open_screenshots_folder,
+            commands::screenshots::export_screenshot,
+            // Modloader matrix
+            commands::modloader_matrix::get_modloader_matrix,
+            commands::modloader_matrix::get_instance_modloader_matrix,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");

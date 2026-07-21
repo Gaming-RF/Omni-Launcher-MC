@@ -950,3 +950,147 @@ export async function getModDetailsUnified(
   return JSON.parse(raw);
 }
 
+// ─── Instance Groups ────────────────────────────────────────────────────
+
+export interface GroupInfo {
+  name: string;
+  color: string;
+  instance_count: number;
+  created_at: string;
+}
+
+export async function listGroups(): Promise<GroupInfo[]> {
+  return invoke("list_groups");
+}
+
+export async function createGroup(name: string, color: string): Promise<GroupInfo> {
+  return invoke("create_group", { name, color });
+}
+
+export async function deleteGroup(name: string): Promise<void> {
+  return invoke("delete_group", { name });
+}
+
+export async function renameGroup(oldName: string, newName: string): Promise<void> {
+  return invoke("rename_group", { oldName, newName });
+}
+
+export async function updateGroupColor(name: string, color: string): Promise<void> {
+  return invoke("update_group_color", { name, color });
+}
+
+export async function assignInstanceToGroup(instanceId: string, groupName: string): Promise<void> {
+  return invoke("assign_instance_to_group", { instanceId, groupName });
+}
+
+export async function removeInstanceFromGroup(instanceId: string, groupName: string): Promise<void> {
+  return invoke("remove_instance_from_group", { instanceId, groupName });
+}
+
+export async function getGroupInstances(groupName: string): Promise<InstanceListItem[]> {
+  return invoke("get_group_instances", { groupName });
+}
+
+// ─── Mirrors ────────────────────────────────────────────────────────────
+
+export interface MirrorInfo {
+  id: string;
+  name: string;
+  base_url: string;
+  is_active: boolean;
+  latency_ms: number | null;
+}
+
+export async function listMirrors(): Promise<MirrorInfo[]> {
+  return invoke("list_mirrors");
+}
+
+export async function getMirror(): Promise<MirrorInfo> {
+  return invoke("get_mirror");
+}
+
+export async function setMirror(mirrorId: string): Promise<void> {
+  return invoke("set_mirror", { mirrorId });
+}
+
+export async function testMirror(mirrorId: string): Promise<number> {
+  return invoke("test_mirror", { mirrorId });
+}
+
+export async function testAllMirrors(): Promise<MirrorInfo[]> {
+  return invoke("test_all_mirrors");
+}
+
+export async function resolveDownloadUrl(url: string): Promise<string> {
+  return invoke("resolve_download_url", { url });
+}
+
+// ─── Templates ──────────────────────────────────────────────────────────
+
+export interface TemplateInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  game_version: string;
+  loader: string;
+  loader_version: string | null;
+  mods: { name: string; slug: string; source: string; project_id: string; description: string }[];
+  is_custom: boolean;
+  category: string;
+}
+
+export async function listTemplates(): Promise<TemplateInfo[]> {
+  return invoke("list_templates");
+}
+
+export async function listCustomTemplates(): Promise<TemplateInfo[]> {
+  return invoke("list_custom_templates");
+}
+
+export async function createInstanceFromTemplate(
+  templateId: string,
+  name: string,
+  gameVersion?: string
+): Promise<InstanceListItem> {
+  return invoke("create_instance_from_template", { templateId, name, gameVersion });
+}
+
+export async function saveAsTemplate(
+  instanceId: string,
+  templateName: string,
+  description: string
+): Promise<TemplateInfo> {
+  return invoke("save_as_template", { instanceId, templateName, description });
+}
+
+export async function deleteCustomTemplate(templateId: string): Promise<void> {
+  return invoke("delete_custom_template", { templateId });
+}
+
+// ─── Mrpack Export ──────────────────────────────────────────────────────
+
+export interface MrpackExportResult {
+  path: string;
+  file_count: number;
+  total_size_bytes: number;
+}
+
+export async function exportMrpack(
+  instanceId: string,
+  includeOptional: boolean,
+  includeConfigs: boolean
+): Promise<MrpackExportResult> {
+  return invoke("export_mrpack", { instanceId, includeOptional, includeConfigs });
+}
+
+export async function exportMrpackToPath(
+  instanceId: string,
+  destPath: string,
+  includeConfigs: boolean,
+  includeResourcepacks: boolean,
+  includeSaves: boolean
+): Promise<MrpackExportResult> {
+  return invoke("export_mrpack_to_path", { instanceId, destPath, includeConfigs, includeResourcepacks, includeSaves });
+}
+

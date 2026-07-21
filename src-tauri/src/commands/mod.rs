@@ -1,3 +1,11 @@
+pub mod groups;
+pub mod mirrors;
+pub mod modloader_matrix;
+pub mod mrpack_export;
+pub mod resource_packs;
+pub mod screenshots;
+pub mod templates;
+
 pub mod auth;
 pub mod hooks;
 pub mod import;
