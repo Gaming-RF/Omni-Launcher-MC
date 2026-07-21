@@ -1,6 +1,6 @@
 [package]
 name = "omni-launcher-mc"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source Minecraft launcher unifying Modrinth, CurseForge, and custom modpacks"
 authors = ["OmniLauncherMC Contributors"]
 edition = "2021"
