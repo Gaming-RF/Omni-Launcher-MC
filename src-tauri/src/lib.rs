@@ -6,6 +6,7 @@ use tauri::Manager;
 pub mod api;
 pub mod commands;
 pub mod db;
+pub mod platforms;
 pub mod utils;
 
 /// Application state shared across commands via Tauri managed state.
@@ -131,6 +132,9 @@ pub fn run() {
             commands::minecraft::search_modpacks_curseforge,
             commands::minecraft::get_modpack_versions_modrinth,
             commands::minecraft::download_and_install_modpack,
+            commands::platform::search_mods_unified,
+            commands::platform::get_mod_versions_unified,
+            commands::platform::get_mod_details_unified,
             // Mod update checker
             commands::loaders::check_mod_updates,
             // Resource packs & shaders

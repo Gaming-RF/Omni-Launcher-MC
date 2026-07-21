@@ -838,3 +838,115 @@ export async function getLogSize(
   return invoke("get_log_size", { instanceId, filename });
 }
 
+// ─── Unified Platform ────────────────────────────────────────────────────
+
+export type ModSource = "modrinth" | "curseforge";
+export type ResourceType =
+  | "mod"
+  | "modpack"
+  | "resourcepack"
+  | "shader"
+  | "datapack";
+export type SortOrder = "relevance" | "downloads" | "updated" | "newest" | "follows";
+
+export interface UnifiedSearchResult {
+  source: ModSource;
+  project_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+  project_type: string;
+}
+
+export interface UnifiedSearchResponse {
+  results: UnifiedSearchResult[];
+  total: number;
+  offset: number;
+  limit: number;
+  source_counts: { modrinth: number; curseforge: number };
+}
+
+export interface UnifiedModVersion {
+  source: ModSource;
+  version_id: string;
+  name: string;
+  version_number: string;
+  game_versions: string[];
+  loaders: string[];
+  downloads: number;
+  date_published: string;
+  files: { filename: string; url: string; size: number; primary: boolean; sha1?: string }[];
+  dependencies: { project_id: string; version_id?: string; dependency_type: string }[];
+  changelog?: string;
+}
+
+export interface UnifiedProjectDetails {
+  source: ModSource;
+  project_id: string;
+  slug: string;
+  title: string;
+  description: string;
+  body?: string;
+  author: string;
+  icon_url: string;
+  downloads: number;
+  categories: string[];
+  project_type: string;
+  source_url?: string;
+  wiki_url?: string;
+  issues_url?: string;
+  date_created: string;
+  date_modified: string;
+}
+
+export interface PlatformSearchArgs {
+  query: string;
+  source?: ModSource;
+  resource_type?: ResourceType;
+  game_version?: string;
+  loader?: string;
+  sort?: SortOrder;
+  offset?: number;
+  limit?: number;
+}
+
+/** Unified search across Modrinth and CurseForge simultaneously */
+export async function searchModsUnified(
+  args: PlatformSearchArgs
+): Promise<UnifiedSearchResponse> {
+  const raw: string = await invoke("search_mods_unified", { args });
+  return JSON.parse(raw);
+}
+
+/** Get versions for a project from a specific source */
+export async function getModVersionsUnified(
+  source: ModSource,
+  projectId: string,
+  gameVersion?: string,
+  loader?: string
+): Promise<UnifiedModVersion[]> {
+  const raw: string = await invoke("get_mod_versions_unified", {
+    source,
+    projectId,
+    gameVersion,
+    loader,
+  });
+  return JSON.parse(raw);
+}
+
+/** Get project details from a specific source */
+export async function getModDetailsUnified(
+  source: ModSource,
+  projectId: string
+): Promise<UnifiedProjectDetails> {
+  const raw: string = await invoke("get_mod_details_unified", {
+    source,
+    projectId,
+  });
+  return JSON.parse(raw);
+}
+

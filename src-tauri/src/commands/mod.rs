@@ -6,6 +6,7 @@ pub mod java;
 pub mod loaders;
 pub mod logs;
 pub mod minecraft;
+pub mod platform;
 pub mod process;
 pub mod shortcuts;
 pub mod skins;
