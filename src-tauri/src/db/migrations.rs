@@ -78,5 +78,13 @@ pub fn run_migrations(db: &Connection) -> Result<()> {
         }
     }
 
+    // Add last_used column to accounts for multi-account switching.
+    match db.execute_batch("ALTER TABLE accounts ADD COLUMN last_used TEXT;") {
+        Ok(()) => log::info!("Added last_used column to accounts table"),
+        Err(_) => {
+            // Column already exists — this is expected on subsequent runs
+        }
+    }
+
     Ok(())
 }

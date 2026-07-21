@@ -14,7 +14,7 @@ pub struct Account {
 pub fn get_all_accounts(db: &rusqlite::Connection) -> Result<Vec<Account>> {
     let mut stmt = db.prepare(
         "SELECT uuid, username, access_token, refresh_token, skin_url 
-         FROM accounts ORDER BY username",
+         FROM accounts ORDER BY last_used DESC NULLS LAST, username",
     )?;
 
     let accounts = stmt
