@@ -99,6 +99,17 @@ src/
 - Shell: default (open URLs)
 - Updater: default
 
+## Bugs Fixed During Validation
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| `accounts.last_used` column missing from schema | Critical | Added ALTER TABLE migration in `migrations.rs`, updated `get_all_accounts` ORDER BY |
+| `useEffect` missing dependency array in Home.tsx | High | Added `[filteredSorted, launchGame]` deps |
+| `filteredSorted` used before declaration | High | Moved `useMemo` above `useEffect` in Home.tsx |
+| Tab variable `t` shadowed i18n `t()` function | Medium | Renamed loop var to `tabId` in InstanceDetail.tsx |
+| i18n translations never called in UI components | Medium | Wired `t()` into Home, Discover, InstanceDetail, Settings |
+| 10MB build artifacts committed to git | Low | Removed from git, added `dist-packages/` to `.gitignore` |
+
 ## What's Still Pending (by design)
 
 ### Requires Configuration
