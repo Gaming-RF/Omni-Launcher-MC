@@ -73,6 +73,7 @@ pub fn run() {
             commands::auth::get_accounts,
             commands::auth::remove_account,
             commands::auth::switch_active_account,
+            commands::auth::refresh_account_token,
             // Instance commands
             commands::instances::get_instances,
             commands::instances::create_instance,

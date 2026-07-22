@@ -276,11 +276,25 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .header("x-xbl-contract-version", "1")
         .json(&xbl_body)
         .send()
-        .await?;
+        .await
+        .context("Failed to send Xbox Live request")?;
     let xbl_status = xbl_resp_raw.status();
     let xbl_text = xbl_resp_raw.text().await.unwrap_or_default();
+    if xbl_text.trim().is_empty() {
+        anyhow::bail!(
+            "Xbox Live returned {} with an empty body. This usually means the Microsoft token is \
+             invalid or missing the XboxLive.signin scope. Try signing in again.",
+            xbl_status
+        );
+    }
     let xbl_resp: serde_json::Value = serde_json::from_str(&xbl_text)
         .map_err(|e| anyhow::anyhow!("Xbox Live decode error ({}): {} — body: {}", xbl_status, e, &xbl_text[..xbl_text.len().min(500)]))?;
+
+    if let Some(err) = xbl_resp.get("error") {
+        let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
+        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("");
+        anyhow::bail!("Xbox Live error (code {}): {}", code, msg);
+    }
 
     let xbl_token = xbl_resp["Token"]
         .as_str()
@@ -305,9 +319,13 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .header("Accept", "application/json")
         .json(&xsts_body)
         .send()
-        .await?;
+        .await
+        .context("Failed to send XSTS request")?;
     let xsts_status = xsts_resp_raw.status();
     let xsts_text = xsts_resp_raw.text().await.unwrap_or_default();
+    if xsts_text.trim().is_empty() {
+        anyhow::bail!("XSTS returned {} with an empty body.", xsts_status);
+    }
     let xsts_resp: serde_json::Value = serde_json::from_str(&xsts_text)
         .map_err(|e| anyhow::anyhow!("XSTS decode error ({}): {} — body: {}", xsts_status, e, &xsts_text[..xsts_text.len().min(500)]))?;
 
@@ -341,9 +359,13 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .header("Content-Type", "application/json")
         .json(&mc_body)
         .send()
-        .await?;
+        .await
+        .context("Failed to send MC auth request")?;
     let mc_status = mc_resp_raw.status();
     let mc_text = mc_resp_raw.text().await.unwrap_or_default();
+    if mc_text.trim().is_empty() {
+        anyhow::bail!("MC auth returned {} with an empty body.", mc_status);
+    }
     let mc_resp: serde_json::Value = serde_json::from_str(&mc_text)
         .map_err(|e| anyhow::anyhow!("MC auth decode error ({}): {} — body: {}", mc_status, e, &mc_text[..mc_text.len().min(500)]))?;
 
