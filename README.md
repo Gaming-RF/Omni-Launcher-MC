@@ -49,9 +49,9 @@ Most Minecraft launchers lock you into a single mod platform. OmniLauncherMC let
 curl -fsSL https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell as Administrator):**
 ```powershell
-irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1 | iex
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1' -OutFile "$env:TEMP\olmc-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\olmc-install.ps1"
 ```
 
 The installers automatically install all dependencies (Rust, Node.js, pnpm, system libs), clone the repo, and build from source. To update later, run `omni-launcher-mc-update`.

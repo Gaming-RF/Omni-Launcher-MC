@@ -1,9 +1,9 @@
 # OmniLauncherMC Windows Installer
 # Builds from source — always latest
-# Run in PowerShell (Admin recommended):
-#   irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1 | iex
-# Or download and run:
-#   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1" -OutFile "$env:TEMP\olmc-install.ps1"; & "$env:TEMP\olmc-install.ps1"
+# Run in PowerShell (as Administrator):
+#   iex "& { $(irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1) }"
+# Or download and run (recommended):
+#   Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1' -OutFile "$env:TEMP\olmc-install.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\olmc-install.ps1"
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -163,14 +163,14 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 # ── Step 6: pnpm ────────────────────────────────────────────────────
 Write-Step "Checking pnpm..."
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    # Try corepack first (ships with Node.js)
+    # Use npm global install (works without admin)
     try {
+        npm install -g pnpm
+    } catch {
+        # Last resort: use npx pnpm
+        Write-Warn "npm -g failed, trying corepack..."
         corepack enable
         corepack prepare pnpm@latest --activate
-        Refresh-Path
-    } catch {
-        # Fallback to npm global
-        npm install -g pnpm
     }
     if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
         Write-Fail "pnpm install failed. Run: npm install -g pnpm"
