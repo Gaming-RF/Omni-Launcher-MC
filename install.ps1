@@ -5,9 +5,6 @@
 # Or download and run:
 #   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1" -OutFile "$env:TEMP\olmc-install.ps1"; & "$env:TEMP\olmc-install.ps1"
 
-[CmdletBinding()]
-param()
-
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
@@ -18,6 +15,7 @@ $BIN_DIR = "$env:LOCALAPPDATA\OmniLauncherMC\bin"
 function Write-Info  { param([string]$msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 function Write-Ok    { param([string]$msg) Write-Host "[OK]   $msg" -ForegroundColor Green }
 function Write-Warn  { param([string]$msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Write-Fail  { param([string]$msg) Write-Host "[FAIL] $msg" -ForegroundColor Red; exit 1 }
 function Write-Step  { param([string]$msg) Write-Host "`n>> $msg" -ForegroundColor White }
 
 function Refresh-Path {
