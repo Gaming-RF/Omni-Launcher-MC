@@ -222,7 +222,7 @@ function ModRow({ mod }: { mod: CategorizedMod }) {
           {l}
         </span>
       ))}
-      <CompatIcon size={14} className={compat.color} title={mod.compatibility} />
+      <span title={mod.compatibility}><CompatIcon size={14} className={compat.color} /></span>
     </div>
   );
 }
