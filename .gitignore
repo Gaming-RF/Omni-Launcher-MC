@@ -55,3 +55,8 @@ Cargo.lock
 # Coverage
 coverage/
 *.lcov
+
+# Tauri signing keys
+*.key
+*.key.pub
+latest.json.sig
