@@ -213,6 +213,22 @@ pub fn run() {
             // Modloader matrix
             commands::modloader_matrix::get_modloader_matrix,
             commands::modloader_matrix::get_instance_modloader_matrix,
+            // Graphics settings
+            commands::graphics::get_graphics_settings,
+            commands::graphics::update_graphics_settings,
+            commands::graphics::apply_graphics_settings,
+            // Resource library
+            commands::library::list_library_items,
+            commands::library::import_to_library,
+            commands::library::link_library_to_instance,
+            commands::library::unlink_library_from_instance,
+            commands::library::cleanup_library,
+            // Resource categorization
+            commands::categorize::categorize_instance_mods,
+            // Multi-instance launch
+            commands::multi_launch::get_all_running_instances,
+            commands::multi_launch::terminate_instance,
+            commands::multi_launch::terminate_all_instances,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OmniLauncherMC");

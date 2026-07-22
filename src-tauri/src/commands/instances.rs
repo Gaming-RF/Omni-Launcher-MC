@@ -98,6 +98,7 @@ pub fn update_instance(
     name: Option<String>,
     java_args: Option<String>,
     allocated_memory_mb: Option<i64>,
+    notes: Option<String>,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let mut instance = db::instances::get_instance(&db, &id)
@@ -112,6 +113,9 @@ pub fn update_instance(
     }
     if let Some(m) = allocated_memory_mb {
         instance.allocated_memory_mb = m;
+    }
+    if notes.is_some() {
+        instance.notes = notes;
     }
 
     db::instances::update_instance(&db, &instance).map_err(|e| e.to_string())?;

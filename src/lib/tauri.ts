@@ -1094,3 +1094,109 @@ export async function exportMrpackToPath(
   return invoke("export_mrpack_to_path", { instanceId, destPath, includeConfigs, includeResourcepacks, includeSaves });
 }
 
+// ─── Graphics Settings ──────────────────────────────────────────────────
+
+export interface GraphicsSettings {
+  render_distance: number;
+  simulation_distance: number;
+  fov: number;
+  gui_scale: number;
+  max_fps: number;
+  vsync: boolean;
+  graphics: string;
+  smooth_lighting: number;
+  particles: number;
+  entity_shadows: boolean;
+  biome_blend: number;
+  clouds: string;
+  fullscreen: boolean;
+  mipmap_levels: number;
+}
+
+export async function getGraphicsSettings(instanceId: string): Promise<GraphicsSettings> {
+  return invoke("get_graphics_settings", { instanceId });
+}
+
+export async function updateGraphicsSettings(instanceId: string, settings: GraphicsSettings): Promise<void> {
+  return invoke("update_graphics_settings", { instanceId, settings });
+}
+
+export async function applyGraphicsSettings(instanceId: string): Promise<void> {
+  return invoke("apply_graphics_settings", { instanceId });
+}
+
+// ─── Resource Library ───────────────────────────────────────────────────
+
+export interface LibraryItem {
+  id: string;
+  name: string;
+  file_name: string;
+  item_type: string;
+  source: string | null;
+  file_size: number;
+  added_at: string;
+  used_by: string[];
+}
+
+export async function listLibraryItems(itemType?: string): Promise<LibraryItem[]> {
+  return invoke("list_library_items", { itemType: itemType ?? null });
+}
+
+export async function importToLibrary(instanceId: string, fileName: string): Promise<LibraryItem> {
+  return invoke("import_to_library", { instanceId, fileName });
+}
+
+export async function linkLibraryToInstance(libraryId: string, instanceId: string, itemType: string): Promise<void> {
+  return invoke("link_library_to_instance", { libraryId, instanceId, itemType });
+}
+
+export async function unlinkLibraryFromInstance(libraryId: string, instanceId: string, itemType: string, fileName: string): Promise<void> {
+  return invoke("unlink_library_from_instance", { libraryId, instanceId, itemType, fileName });
+}
+
+export async function cleanupLibrary(): Promise<[number, number]> {
+  return invoke("cleanup_library");
+}
+
+// ─── Resource Categorization ────────────────────────────────────────────
+
+export interface ModCategory {
+  category: string;
+  subcategories: string[];
+  description: string;
+}
+
+export interface CategorizedMod {
+  mod_id: string;
+  name: string;
+  file_name: string;
+  detected_category: ModCategory;
+  detected_loaders: string[];
+  detected_game_versions: string[];
+  compatibility: string;
+}
+
+export async function categorizeInstanceMods(instanceId: string): Promise<CategorizedMod[]> {
+  return invoke("categorize_instance_mods", { instanceId });
+}
+
+// ─── Multi-Instance Launch ──────────────────────────────────────────────
+
+export interface RunningInstanceInfo {
+  instance_id: string;
+  instance_name: string;
+  is_running: boolean;
+}
+
+export async function getAllRunningInstances(): Promise<RunningInstanceInfo[]> {
+  return invoke("get_all_running_instances");
+}
+
+export async function terminateInstance(instanceId: string): Promise<void> {
+  return invoke("terminate_instance", { instanceId });
+}
+
+export async function terminateAllInstances(): Promise<number> {
+  return invoke("terminate_all_instances");
+}
+

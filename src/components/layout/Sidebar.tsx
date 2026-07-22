@@ -5,6 +5,7 @@ import {
   Settings,
   User,
   Download,
+  Database,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/auth";
 
@@ -12,6 +13,7 @@ const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/discover", icon: Compass, label: "Discover" },
   { to: "/import", icon: Download, label: "Import" },
+  { to: "/library", icon: Database, label: "Library" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

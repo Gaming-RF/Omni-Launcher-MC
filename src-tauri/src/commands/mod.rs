@@ -1,7 +1,11 @@
+pub mod categorize;
+pub mod graphics;
 pub mod groups;
+pub mod library;
 pub mod mirrors;
 pub mod modloader_matrix;
 pub mod mrpack_export;
+pub mod multi_launch;
 pub mod resource_packs;
 pub mod screenshots;
 pub mod templates;

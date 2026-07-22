@@ -6,6 +6,8 @@ import { Discover } from "./pages/Discover";
 import { Settings } from "./pages/Settings";
 import { InstanceDetailPage } from "./pages/InstanceDetailPage";
 import Import from "./pages/Import";
+import Library from "./pages/Library";
+import RunningInstancesBar from "./components/layout/RunningInstancesBar";
 import { useAppInit } from "./hooks/useAppInit";
 import { useDownloadProgress } from "./hooks/useDownloadProgress";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -42,8 +44,10 @@ export default function App() {
           <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
           <Route path="/import" element={<PageTransition><Import /></PageTransition>} />
           <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
+          <Route path="/library" element={<PageTransition><Library /></PageTransition>} />
         </Routes>
       </main>
+      <RunningInstancesBar />
 
       {/* Global overlay components */}
       <DownloadProgress />
