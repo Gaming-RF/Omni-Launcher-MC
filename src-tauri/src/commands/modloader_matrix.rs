@@ -210,7 +210,7 @@ async fn fetch_quilt(
             let is_release = v
                 .get("loader")
                 .and_then(|l| l.get("version"))
-                .and_then(|_| Some(true)) // Quilt versions are generally stable
+                .map(|_| true) // Quilt versions are generally stable
                 .unwrap_or(true);
             Some(LoaderVersionInfo {
                 version,

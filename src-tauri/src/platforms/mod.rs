@@ -211,7 +211,7 @@ pub async fn search_unified(req: &UnifiedSearchRequest) -> anyhow::Result<Unifie
     }
 
     // Sort merged results by downloads (descending)
-    results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+    results.sort_by_key(|b| std::cmp::Reverse(b.downloads));
 
     // Apply pagination
     let total = results.len() as u32;

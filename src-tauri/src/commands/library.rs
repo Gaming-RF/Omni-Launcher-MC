@@ -53,7 +53,7 @@ fn scan_type(item_type: &str) -> Vec<LibraryItem> {
             continue;
         };
         // Find instances that link to this
-        let used_by = find_usage(&item_type.to_string(), &entry.file_name().to_string_lossy());
+        let used_by = find_usage(item_type, &entry.file_name().to_string_lossy());
         items.push(LibraryItem {
             id: entry.file_name().to_string_lossy().to_string(),
             name: meta
