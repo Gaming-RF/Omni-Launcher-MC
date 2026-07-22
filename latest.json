@@ -1,22 +1,22 @@
 {
   "version": "0.2.2",
   "notes": "Tauri native auto-updater with signed updates, auth fixes, modpack resilience, CurseForge image fix",
-  "pub_date": "2026-07-22T10:15:00Z",
+  "pub_date": "2026-07-22T10:40:00Z",
   "platforms": {
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRelNFSWlNZXhsTXBGMzFuUjJQb292NTNQclNlc2I2ZkJKaUpSc0t3MXZIOHFsS1BGRVU0dDJOSnpic3F5dEl4VzB6NjFLdzlqb1V3c1pVQVAyVklpUVVNRWhFL28zT1E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzA5OTE3CWZpbGU6T21uaUxhdW5jaGVyTUNfMC4yLjFfYW1kNjQuZGViCmpSWmxWWmFuWlRjNEx3dUQ2WGhLVFh0VlJSeksxZXJpRGNwTFRqN3QxQkpaUXhxb1RKMGMycmlxVmhVM0VjNm0wcE5lY1ppc2NYeStKeFdhUlM2WUR3PT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVnVxbmNCUXZ0Ukt1ejZNK0V5b0Q0VDNNUTE4bXpCejF0VzFPdVBnNldibnJYWWIrNTlZd0trTmlXdFhpZUc2SzV2YU1wS2kzbUJXTU9qYWV2c0c4RXIwZXdUWGwyM3dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzE2ODQ2CWZpbGU6T21uaUxhdW5jaGVyTUNfMC4yLjJfYW1kNjQuZGViClR2SHpiRDE1ZTh3SENic3htNW1SamFCaExhN3R1Sm95UUFuUjVTNElxb3NRQjM1eXhFVVplTmFmeEo0NGJ2cmZZL04xWmI0TW1HRmQ1ZXpHS1JOMUJRPT0K",
       "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_0.2.2_amd64.deb"
     },
     "windows-x86_64": {
-      "signature": "",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVnVxbmNCUXZ0UkZWV0F2czhpcGJWUEVXVmMyMEhqWVJ2NkNOY3dEa3VpajJhN1BRTHZHZHN4c20rZmRjZFlnZCt5OFdMTDBGOCtEUUc4UEl4NmJUYWVJSXBSaE55M3djPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzE2ODQ0CWZpbGU6T21uaUxhdW5jaGVyTUNfMC4yLjJfeDY0X2VuLVVTLm1zaQpNMjN5bG0yVGVPZm1Rc0h2cTRFeS8rdld3aGVZWDhFOHRtTEVtWGJCNnFqdEZaaU13RXdBYXlMOFJnL3I0RUhwUkJRQklQMlBrRW9rdHhJYW00SUhCUT09Cg==",
       "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_0.2.2_x64_en-US.msi"
     },
     "darwin-x86_64": {
-      "signature": "",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVnVxbmNCUXZ0UkExRWpBSmwza1hXbTJERjZPa3dvbU1MQTRpckxydis0Nm9POHZXMkRXRTI1TDV4OFhVMVRMYlIrNEkzbjc3MmZsajlXeHFpQ2hxMFZjYm90QS9ReEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzE2ODQ1CWZpbGU6T21uaUxhdW5jaGVyTUNfeDY0LmFwcC50YXIuZ3oKanF2V1dFMVg3OGh0NDg3ZkpZbUs2cEU4aTk2RzV5MHBYTEl2S0FVcldEQU5qVUhZa3k0a2pwREJZNWNKend4aEVoMk1tdmt4enppbUlVN1hwbk1TQ2c9PQo=",
       "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_x64.app.tar.gz"
     },
     "darwin-aarch64": {
-      "signature": "",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSVnVxbmNCUXZ0Uk1hTWtBWTRpdGs1amM5b09qT0t1SWhIemhKNjlTUTlaRzZIK0VrNXBEd3lDQzBBaDVhb3lMQmliMXdVZDFLR0h1MUJWVjJETFB2ZFkxRjZzZTN3dUFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzE2ODQ1CWZpbGU6T21uaUxhdW5jaGVyTUNfYWFyY2g2NC5hcHAudGFyLmd6CjRsL0JzSlpuYll3UEFSNlRoY25ZVkphQ2wzU0hGekZBQ1FCbVlvT3I1THozVnc4QSsxUmhNL3YrckRybjhtUFNhVm91RktXcW9ZL0ljVllqc1I1ckFnPT0K",
       "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_aarch64.app.tar.gz"
     }
   }

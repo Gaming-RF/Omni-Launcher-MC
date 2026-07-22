@@ -23,10 +23,10 @@ jobs:
             label: windows-x86_64
           - platform: macos-latest
             target: aarch64-apple-darwin
-            label: macos-aarch64
+            label: darwin-aarch64
           - platform: macos-latest
             target: x86_64-apple-darwin
-            label: macos-x86_64
+            label: darwin-x86_64
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -91,3 +91,92 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+      - name: Upload updater signatures
+        uses: actions/upload-artifact@v4
+        with:
+          name: signatures-${{ matrix.label }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
+          if-no-files-found: warn
+
+  updater-json:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download all signatures
+        uses: actions/download-artifact@v4
+        with:
+          path: sigs
+          pattern: signatures-*
+          merge-multiple: true
+
+      - name: Generate latest.json and upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Find signature files and read them
+          find sigs -name "*.sig" -type f | sort | while read f; do echo "Found sig: $f"; done
+
+          # Helper: read .sig file content (single line base64)
+          read_sig() {
+            local pattern="$1"
+            local f
+            f=$(find sigs -name "$pattern" -type f | head -1)
+            if [ -n "$f" ]; then
+              cat "$f"
+            else
+              echo ""
+            fi
+          }
+
+          LINUX_SIG=$(read_sig "OmniLauncherMC_${VERSION}_amd64.deb.sig")
+          WINDOWS_SIG=$(read_sig "OmniLauncherMC_${VERSION}_x64_en-US.msi.sig")
+          DARWIN_X64_SIG=$(read_sig "OmniLauncherMC_x64.app.tar.gz.sig")
+          DARWIN_AARCH64_SIG=$(read_sig "OmniLauncherMC_aarch64.app.tar.gz.sig")
+
+          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+
+          cat > latest.json <<EOJSON
+          {
+            "version": "${VERSION}",
+            "notes": "OmniLauncherMC ${TAG}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "linux-x86_64": {
+                "signature": "${LINUX_SIG}",
+                "url": "${BASE_URL}/OmniLauncherMC_${VERSION}_amd64.deb"
+              },
+              "windows-x86_64": {
+                "signature": "${WINDOWS_SIG}",
+                "url": "${BASE_URL}/OmniLauncherMC_${VERSION}_x64_en-US.msi"
+              },
+              "darwin-x86_64": {
+                "signature": "${DARWIN_X64_SIG}",
+                "url": "${BASE_URL}/OmniLauncherMC_x64.app.tar.gz"
+              },
+              "darwin-aarch64": {
+                "signature": "${DARWIN_AARCH64_SIG}",
+                "url": "${BASE_URL}/OmniLauncherMC_aarch64.app.tar.gz"
+              }
+            }
+          }
+          EOJSON
+
+          # Strip leading whitespace from heredoc indentation
+          sed -i 's/^          //' latest.json
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+          # Upload to release
+          gh release upload "${TAG}" latest.json --clobber
+          echo "latest.json uploaded to release ${TAG}"
+
+          # Publish the release (remove draft flag)
+          gh release edit "${TAG}" --draft=false
+          echo "Release ${TAG} published"
