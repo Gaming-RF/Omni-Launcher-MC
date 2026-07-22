@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.modrinth.com https://api.curseforge.com https://piston-meta.mojang.com https://launchermeta.mojang.com https://libraries.minecraft.net https://authserver.mojang.com https://sessionserver.mojang.com https://login.microsoftonline.com https://user.auth.xboxlive.com https://xsts.auth.xboxlive.com https://api.minecraftservices.com https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://meta.quiltmc.net https://api.adoptium.net https://*.githubusercontent.com https://*.github.com; img-src 'self' asset: http://asset.localhost https://cdn.modrinth.com https://mediafilez.forgecdn.net https://mc-heads.net https://crafatar.com data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.modrinth.com https://api.curseforge.com https://piston-meta.mojang.com https://launchermeta.mojang.com https://libraries.minecraft.net https://authserver.mojang.com https://sessionserver.mojang.com https://login.microsoftonline.com https://user.auth.xboxlive.com https://xsts.auth.xboxlive.com https://api.minecraftservices.com https://meta.fabricmc.net https://maven.minecraftforge.net https://maven.neoforged.net https://meta.quiltmc.net https://api.adoptium.net https://*.githubusercontent.com https://*.github.com; img-src 'self' asset: http://asset.localhost https://cdn.modrinth.com https://mediafilez.forgecdn.net https://media.forgecdn.net https://*.forgecdn.net https://mc-heads.net https://crafatar.com data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:"
     }
   },
   "bundle": {
