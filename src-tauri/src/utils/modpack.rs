@@ -20,12 +20,15 @@ use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MrpackIndex {
+    #[serde(default)]
     pub format_version: u32,
     pub game: String,
     pub version_id: String,
+    #[serde(default)]
     pub name: String,
     pub summary: Option<String>,
     pub files: Vec<MrpackFile>,
+    #[serde(default)]
     pub dependencies: MrpackDependencies,
 }
 
@@ -45,7 +48,7 @@ pub struct MrpackEnv {
     pub server: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct MrpackDependencies {
     pub minecraft: String,
     #[serde(rename = "fabric-loader")]

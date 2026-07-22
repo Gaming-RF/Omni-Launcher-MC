@@ -127,7 +127,10 @@ pub async fn exchange_code(code: &str, code_verifier: &str) -> Result<(String, S
 
     let resp = client.post(TOKEN_URL).form(&params).send().await?;
 
-    let token_resp: TokenResponse = resp.json().await?;
+    let status = resp.status();
+    let body_text = resp.text().await.unwrap_or_default();
+    let token_resp: TokenResponse = serde_json::from_str(&body_text)
+        .map_err(|e| anyhow::anyhow!("Failed to decode token response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!(
@@ -157,7 +160,10 @@ pub async fn refresh_msa_token(refresh_token: &str) -> Result<(String, String)> 
     params.insert("grant_type", "refresh_token");
 
     let resp = client.post(TOKEN_URL).form(&params).send().await?;
-    let token_resp: TokenResponse = resp.json().await?;
+    let status = resp.status();
+    let body_text = resp.text().await.unwrap_or_default();
+    let token_resp: TokenResponse = serde_json::from_str(&body_text)
+        .map_err(|e| anyhow::anyhow!("Failed to decode refresh response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!("Refresh error: {}", error);
@@ -228,7 +234,10 @@ pub async fn poll_for_token(device_code: &str) -> Result<(String, String)> {
     params.insert("device_code", device_code);
 
     let resp = client.post(TOKEN_URL).form(&params).send().await?;
-    let token_resp: TokenResponse = resp.json().await?;
+    let status = resp.status();
+    let body_text = resp.text().await.unwrap_or_default();
+    let token_resp: TokenResponse = serde_json::from_str(&body_text)
+        .map_err(|e| anyhow::anyhow!("Failed to decode poll response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!(error.clone());
@@ -260,16 +269,18 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         "Service": "JWT"
     });
 
-    let xbl_resp: serde_json::Value = client
+    let xbl_resp_raw = client
         .post(XBL_AUTH_URL)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("x-xbl-contract-version", "1")
         .json(&xbl_body)
         .send()
-        .await?
-        .json()
         .await?;
+    let xbl_status = xbl_resp_raw.status();
+    let xbl_text = xbl_resp_raw.text().await.unwrap_or_default();
+    let xbl_resp: serde_json::Value = serde_json::from_str(&xbl_text)
+        .map_err(|e| anyhow::anyhow!("Xbox Live decode error ({}): {} — body: {}", xbl_status, e, &xbl_text[..xbl_text.len().min(500)]))?;
 
     let xbl_token = xbl_resp["Token"]
         .as_str()
@@ -288,15 +299,17 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         "Service": "JWT"
     });
 
-    let xsts_resp: serde_json::Value = client
+    let xsts_resp_raw = client
         .post(XSTS_AUTH_URL)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .json(&xsts_body)
         .send()
-        .await?
-        .json()
         .await?;
+    let xsts_status = xsts_resp_raw.status();
+    let xsts_text = xsts_resp_raw.text().await.unwrap_or_default();
+    let xsts_resp: serde_json::Value = serde_json::from_str(&xsts_text)
+        .map_err(|e| anyhow::anyhow!("XSTS decode error ({}): {} — body: {}", xsts_status, e, &xsts_text[..xsts_text.len().min(500)]))?;
 
     if let Some(err_code) = xsts_resp["XErr"].as_i64() {
         if err_code != 0 {
@@ -323,14 +336,16 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         "identityToken": format!("XBL3.0 x={};{}", uhs, xsts_token)
     });
 
-    let mc_resp: serde_json::Value = client
+    let mc_resp_raw = client
         .post(MC_AUTH_URL)
         .header("Content-Type", "application/json")
         .json(&mc_body)
         .send()
-        .await?
-        .json()
         .await?;
+    let mc_status = mc_resp_raw.status();
+    let mc_text = mc_resp_raw.text().await.unwrap_or_default();
+    let mc_resp: serde_json::Value = serde_json::from_str(&mc_text)
+        .map_err(|e| anyhow::anyhow!("MC auth decode error ({}): {} — body: {}", mc_status, e, &mc_text[..mc_text.len().min(500)]))?;
 
     let mc_token = mc_resp["access_token"]
         .as_str()
@@ -349,12 +364,14 @@ pub async fn get_minecraft_profile(mc_token: &str) -> Result<MinecraftProfile> {
         .send()
         .await?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Profile fetch failed ({}): {}", status, body);
+    let status = resp.status();
+    let body_text = resp.text().await.unwrap_or_default();
+
+    if !status.is_success() {
+        anyhow::bail!("Profile fetch failed ({}): {}", status, body_text);
     }
 
-    let profile: MinecraftProfile = resp.json().await?;
+    let profile: MinecraftProfile = serde_json::from_str(&body_text)
+        .map_err(|e| anyhow::anyhow!("Profile decode error ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
     Ok(profile)
 }
