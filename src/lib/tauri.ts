@@ -308,6 +308,7 @@ export interface ModVersionInfo {
   download_count: number;
   file_name: string | null;
   file_url: string | null;
+  game_versions?: string[];
 }
 
 export async function getModrinthVersions(
@@ -474,17 +475,6 @@ export interface ModpackSearchResult {
   icon_url: string;
   downloads: number;
   categories: string[];
-  game_versions: string[];
-}
-
-export interface ModVersionInfo {
-  version_id: string;
-  name: string;
-  version_number: string;
-  date_published: string;
-  download_count: number;
-  file_name: string | null;
-  file_url: string | null;
   game_versions: string[];
 }
 

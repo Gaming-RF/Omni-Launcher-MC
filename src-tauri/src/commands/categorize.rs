@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::paths::data_dir;
 use serde::Serialize;
 use std::fs;
@@ -222,7 +223,7 @@ fn read_jar_metadata(path: &std::path::Path) -> Option<(String, Vec<String>, Vec
 }
 
 #[tauri::command]
-pub fn categorize_instance_mods(instance_id: String) -> Result<Vec<CategorizedMod>, String> {
+pub fn categorize_instance_mods(instance_id: String) -> Result<Vec<CategorizedMod>, AppError> {
     let mods_dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -232,8 +233,8 @@ pub fn categorize_instance_mods(instance_id: String) -> Result<Vec<CategorizedMo
         return Ok(Vec::new());
     }
     let mut result = Vec::new();
-    for entry in fs::read_dir(&mods_dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(&mods_dir)? {
+        let entry = entry?;
         let name = entry.file_name().to_string_lossy().to_string();
         if !name.ends_with(".jar") {
             continue;

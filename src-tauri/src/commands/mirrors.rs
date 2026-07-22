@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::db::settings::{get_setting, set_setting};
 use crate::utils::mirrors::{resolve_url, Mirror};
 use crate::AppState;
@@ -38,8 +39,8 @@ fn active_mirror_id(db: &rusqlite::Connection) -> String {
 
 /// List all available mirrors with active state.
 #[tauri::command]
-pub fn list_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn list_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let active_id = active_mirror_id(&db);
     Ok(Mirror::all()
         .iter()
@@ -49,8 +50,8 @@ pub fn list_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, Strin
 
 /// Get the currently-selected mirror.
 #[tauri::command]
-pub fn get_mirror(state: State<'_, AppState>) -> Result<MirrorInfo, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn get_mirror(state: State<'_, AppState>) -> Result<MirrorInfo, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let active_id = active_mirror_id(&db);
     let mirror = Mirror::from_id(&active_id).unwrap_or(Mirror::Official);
     Ok(build_info(&mirror, &active_id, None))
@@ -58,19 +59,20 @@ pub fn get_mirror(state: State<'_, AppState>) -> Result<MirrorInfo, String> {
 
 /// Set the active mirror by its id string.
 #[tauri::command]
-pub fn set_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<(), String> {
+pub fn set_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<(), AppError> {
     // Validate the id first
     if Mirror::from_id(&mirror_id).is_none() {
-        return Err(format!("Unknown mirror id: {}", mirror_id));
+        return Err(AppError::Internal(format!("Unknown mirror id: {}", mirror_id)));
     }
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    set_setting(&db, "download_mirror", &mirror_id).map_err(|e| e.to_string())
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    set_setting(&db, "download_mirror", &mirror_id).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
 /// Test a single mirror's latency by sending an HTTP HEAD request.
 /// Returns latency in milliseconds.
 #[tauri::command]
-pub async fn test_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<u64, String> {
+pub async fn test_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<u64, AppError> {
     let mirror =
         Mirror::from_id(&mirror_id).ok_or_else(|| format!("Unknown mirror id: {}", mirror_id))?;
 
@@ -103,9 +105,9 @@ pub async fn test_mirror(state: State<'_, AppState>, mirror_id: String) -> Resul
 
 /// Test all mirrors and return results with latency info.
 #[tauri::command]
-pub async fn test_all_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, String> {
+pub async fn test_all_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, AppError> {
     let active_id = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         active_mirror_id(&db)
     };
 
@@ -149,8 +151,8 @@ pub async fn test_all_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorIn
 
 /// Resolve a Mojang download URL through the currently-selected mirror.
 #[tauri::command]
-pub fn resolve_download_url(state: State<'_, AppState>, url: String) -> Result<String, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn resolve_download_url(state: State<'_, AppState>, url: String) -> Result<String, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let active_id = active_mirror_id(&db);
     let mirror = Mirror::from_id(&active_id).unwrap_or(Mirror::Official);
     Ok(resolve_url(&url, &mirror))

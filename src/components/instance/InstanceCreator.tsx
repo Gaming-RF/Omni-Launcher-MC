@@ -86,7 +86,7 @@ export function InstanceCreator() {
         }
         setModpackLoading(false);
       }
-    } catch (err) {
+    } catch {
       setModpackError("File dialog not available. Path entry coming soon.");
     }
   };

@@ -46,6 +46,7 @@ export function Home() {
   const [showSignInBanner, setShowSignInBanner] = useState(true);
   const [selectedInstance, setSelectedInstance] = useState<InstanceListItem | null>(null);
   const [shareInstance, setShareInstance] = useState<InstanceListItem | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<InstanceListItem | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [offlineDialog, setOfflineDialog] = useState<string | null>(null);
   const [offlineUsername, setOfflineUsername] = useState(() =>
@@ -320,7 +321,7 @@ export function Home() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteInstance(instance.id);
+                          setDeleteConfirm(instance);
                         }}
                         className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1"
                         title="Delete instance"
@@ -416,6 +417,34 @@ export function Home() {
               className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               {t("home.launch")}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {/* Delete confirmation dialog */}
+    {deleteConfirm && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-sm mx-4 p-6">
+          <h2 className="text-lg font-semibold text-white mb-2">Delete Instance</h2>
+          <p className="text-sm text-slate-400 mb-4">
+            Are you sure you want to delete <span className="text-white font-medium">{deleteConfirm.name}</span>? This cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setDeleteConfirm(null)}
+              className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                deleteInstance(deleteConfirm.id);
+                setDeleteConfirm(null);
+              }}
+              className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Delete
             </button>
           </div>
         </div>

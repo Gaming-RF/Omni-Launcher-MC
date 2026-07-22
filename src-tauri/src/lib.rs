@@ -6,6 +6,7 @@ use tauri::Manager;
 pub mod api;
 pub mod commands;
 pub mod db;
+pub mod error;
 pub mod platforms;
 pub mod utils;
 

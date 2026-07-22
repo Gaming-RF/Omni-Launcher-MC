@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::db;
 use crate::AppState;
 use serde::Serialize;
@@ -16,10 +17,10 @@ pub struct InstanceHooks {
 pub fn get_instance_hooks(
     state: State<'_, AppState>,
     instance_id: String,
-) -> Result<InstanceHooks, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<InstanceHooks, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let instance = db::instances::get_instance(&db, &instance_id)
-        .map_err(|e| e.to_string())?
+        ?
         .ok_or("Instance not found")?;
 
     Ok(InstanceHooks {
@@ -35,8 +36,8 @@ pub fn update_instance_hooks(
     state: State<'_, AppState>,
     instance_id: String,
     hooks: InstanceHooks,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
     db.execute(
         "UPDATE instances SET pre_launch_cmd = ?1, post_exit_cmd = ?2, hook_env_vars = ?3 WHERE id = ?4",
@@ -47,13 +48,13 @@ pub fn update_instance_hooks(
             instance_id
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
 
 /// Execute a pre-launch hook command.
-pub async fn execute_pre_launch(instance_id: &str, hooks: &InstanceHooks) -> Result<(), String> {
+pub async fn execute_pre_launch(instance_id: &str, hooks: &InstanceHooks) -> Result<(), AppError> {
     if let Some(ref cmd) = hooks.pre_launch_cmd {
         if cmd.is_empty() {
             return Ok(());
@@ -70,14 +71,14 @@ pub async fn execute_pre_launch(instance_id: &str, hooks: &InstanceHooks) -> Res
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Pre-launch hook failed: {}", stderr));
+            return Err(AppError::Internal(format!("{}", "")));
         }
     }
     Ok(())
 }
 
 /// Execute a post-exit hook command.
-pub async fn execute_post_exit(instance_id: &str, hooks: &InstanceHooks) -> Result<(), String> {
+pub async fn execute_post_exit(instance_id: &str, hooks: &InstanceHooks) -> Result<(), AppError> {
     if let Some(ref cmd) = hooks.post_exit_cmd {
         if cmd.is_empty() {
             return Ok(());

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::api::curseforge;
 use crate::api::loaders;
 use crate::api::minecraft;
@@ -19,10 +20,10 @@ pub struct LoaderVersionInfo {
 #[tauri::command]
 pub async fn get_fabric_loader_versions(
     mc_version: String,
-) -> Result<Vec<LoaderVersionInfo>, String> {
+) -> Result<Vec<LoaderVersionInfo>, AppError> {
     let versions = loaders::fabric::get_loader_versions(&mc_version)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(versions
         .into_iter()
@@ -36,10 +37,10 @@ pub async fn get_fabric_loader_versions(
 #[tauri::command]
 pub async fn get_quilt_loader_versions(
     mc_version: String,
-) -> Result<Vec<LoaderVersionInfo>, String> {
+) -> Result<Vec<LoaderVersionInfo>, AppError> {
     let versions = loaders::quilt::get_loader_versions(&mc_version)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(versions
         .into_iter()
@@ -51,17 +52,17 @@ pub async fn get_quilt_loader_versions(
 }
 
 #[tauri::command]
-pub async fn get_forge_versions(mc_version: String) -> Result<Vec<String>, String> {
-    loaders::forge::get_forge_versions(&mc_version)
+pub async fn get_forge_versions(mc_version: String) -> Result<Vec<String>, AppError> {
+    Ok(loaders::forge::get_forge_versions(&mc_version)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))?)
 }
 
 #[tauri::command]
-pub async fn get_neoforge_versions(mc_version: String) -> Result<Vec<String>, String> {
-    loaders::neoforge::get_neoforge_versions(&mc_version)
+pub async fn get_neoforge_versions(mc_version: String) -> Result<Vec<String>, AppError> {
+    Ok(loaders::neoforge::get_neoforge_versions(&mc_version)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))?)
 }
 
 // ── Loader Installation ────────────────────────────────────────
@@ -71,29 +72,29 @@ pub async fn install_fabric_loader(
     state: State<'_, AppState>,
     instance_id: String,
     loader_version: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?
     };
 
     let base_dir = crate::utils::paths::data_dir();
     let profile_id = loaders::fabric::install(&base_dir, &instance.game_version, &loader_version)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Update the instance's loader and version info
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
         inst.loader = "fabric".to_string();
         inst.loader_version = Some(loader_version);
         // Update game_version to the profile ID so the launcher uses the Fabric JSON
-        db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
+        db::instances::update_instance(&db, &inst)?;
     }
 
     Ok(format!("Fabric installed: {}", profile_id))
@@ -104,27 +105,27 @@ pub async fn install_quilt_loader(
     state: State<'_, AppState>,
     instance_id: String,
     loader_version: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?
     };
 
     let base_dir = crate::utils::paths::data_dir();
     let profile_id = loaders::quilt::install(&base_dir, &instance.game_version, &loader_version)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
         inst.loader = "quilt".to_string();
         inst.loader_version = Some(loader_version);
-        db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
+        db::instances::update_instance(&db, &inst)?;
     }
 
     Ok(format!("Quilt installed: {}", profile_id))
@@ -135,27 +136,27 @@ pub async fn install_forge_loader(
     state: State<'_, AppState>,
     instance_id: String,
     forge_version: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?
     };
 
     let base_dir = crate::utils::paths::data_dir();
     let profile_id = loaders::forge::install(&base_dir, &instance.game_version, &forge_version)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
         inst.loader = "forge".to_string();
         inst.loader_version = Some(forge_version);
-        db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
+        db::instances::update_instance(&db, &inst)?;
     }
 
     Ok(format!("Forge installed: {}", profile_id))
@@ -166,11 +167,11 @@ pub async fn install_neoforge_loader(
     state: State<'_, AppState>,
     instance_id: String,
     neoforge_version: String,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?
     };
 
@@ -178,16 +179,16 @@ pub async fn install_neoforge_loader(
     let profile_id =
         loaders::neoforge::install(&base_dir, &instance.game_version, &neoforge_version)
             .await
-            .map_err(|e| e.to_string())?;
+            ?;
 
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let mut inst = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
         inst.loader = "neoforge".to_string();
         inst.loader_version = Some(neoforge_version);
-        db::instances::update_instance(&db, &inst).map_err(|e| e.to_string())?;
+        db::instances::update_instance(&db, &inst)?;
     }
 
     Ok(format!("NeoForge installed: {}", profile_id))
@@ -211,9 +212,9 @@ pub struct InstalledModInfo {
 pub fn get_instance_mods(
     state: State<'_, AppState>,
     instance_id: String,
-) -> Result<Vec<InstalledModInfo>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+) -> Result<Vec<InstalledModInfo>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let mods = db::mods::get_instance_mods(&db, &instance_id)?;
 
     Ok(mods
         .into_iter()
@@ -238,21 +239,21 @@ pub async fn install_mod_from_modrinth(
     project_id: String,
     game_version: String,
     loader: String,
-) -> Result<InstalledModInfo, String> {
+) -> Result<InstalledModInfo, AppError> {
     // Check if already installed
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         if db::mods::is_mod_installed(&db, &instance_id, &project_id, "modrinth")
-            .map_err(|e| e.to_string())?
+            ?
         {
-            return Err("Mod is already installed".to_string());
+            return Err(AppError::Internal("Mod is already installed".to_string()));
         }
     }
 
     // Get the latest version for this game version + loader
     let versions = modrinth::get_project_versions(&project_id, Some(&loader), Some(&game_version))
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let version = versions
         .first()
@@ -269,15 +270,15 @@ pub async fn install_mod_from_modrinth(
     let mods_dir = crate::utils::paths::instances_dir()
         .join(&instance_id)
         .join("mods");
-    std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&mods_dir)?;
 
     let dest = mods_dir.join(&file.filename);
     crate::api::minecraft::download_file(Some(&state.http), &file.url, &dest)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Record in database
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     db::mods::record_mod_install(
         &db,
         &instance_id,
@@ -287,7 +288,7 @@ pub async fn install_mod_from_modrinth(
         &version.version_number,
         &file.filename,
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(InstalledModInfo {
         id: 0, // Will be set by DB
@@ -307,13 +308,13 @@ pub fn toggle_mod_enabled(
     state: State<'_, AppState>,
     mod_id: i64,
     instance_id: String,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     let mods_dir = crate::utils::paths::instances_dir()
         .join(&instance_id)
         .join("mods");
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db::mods::toggle_mod(&db, mod_id, &mods_dir).map_err(|e| e.to_string())
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(db::mods::toggle_mod(&db, mod_id, &mods_dir).map_err(|e| AppError::Internal(e.to_string()))?)
 }
 
 /// Remove a mod from an instance.
@@ -322,13 +323,13 @@ pub fn remove_mod(
     state: State<'_, AppState>,
     mod_id: i64,
     instance_id: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let mods_dir = crate::utils::paths::instances_dir()
         .join(&instance_id)
         .join("mods");
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db::mods::remove_mod(&db, mod_id, &mods_dir).map_err(|e| e.to_string())
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(db::mods::remove_mod(&db, mod_id, &mods_dir).map_err(|e| AppError::Internal(e.to_string()))?)
 }
 
 // ── Modpack Import ─────────────────────────────────────────────
@@ -348,9 +349,9 @@ pub struct ModpackInfoResult {
 
 /// Parse a .mrpack file and return its metadata.
 #[tauri::command]
-pub fn parse_mrpack_file(file_path: String) -> Result<ModpackInfoResult, String> {
+pub fn parse_mrpack_file(file_path: String) -> Result<ModpackInfoResult, AppError> {
     let path = std::path::PathBuf::from(&file_path);
-    let info = modpack::parse_mrpack(&path).map_err(|e| e.to_string())?;
+    let info = modpack::parse_mrpack(&path)?;
 
     Ok(ModpackInfoResult {
         name: info.name,
@@ -365,9 +366,9 @@ pub fn parse_mrpack_file(file_path: String) -> Result<ModpackInfoResult, String>
 
 /// Parse a CurseForge modpack ZIP and return its metadata.
 #[tauri::command]
-pub fn parse_cf_modpack_file(file_path: String) -> Result<ModpackInfoResult, String> {
+pub fn parse_cf_modpack_file(file_path: String) -> Result<ModpackInfoResult, AppError> {
     let path = std::path::PathBuf::from(&file_path);
-    let info = modpack::parse_cf_modpack(&path).map_err(|e| e.to_string())?;
+    let info = modpack::parse_cf_modpack(&path)?;
 
     Ok(ModpackInfoResult {
         name: info.name,
@@ -386,13 +387,13 @@ pub async fn install_mrpack_modpack(
     state: State<'_, AppState>,
     file_path: String,
     instance_name: String,
-) -> Result<InstanceListItem, String> {
+) -> Result<InstanceListItem, AppError> {
     let path = std::path::PathBuf::from(&file_path);
-    let info = modpack::parse_mrpack(&path).map_err(|e| e.to_string())?;
+    let info = modpack::parse_mrpack(&path)?;
 
     // Create instance in database
     let instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::create_instance(
             &db,
             db::instances::CreateInstanceParams {
@@ -405,14 +406,14 @@ pub async fn install_mrpack_modpack(
                 allocated_memory_mb: 4096,
             },
         )
-        .map_err(|e| e.to_string())?
+        ?
     };
 
     // Create instance directory and install modpack files
     let instance_dir = crate::utils::paths::instances_dir().join(&instance.id);
     modpack::install_mrpack(&path, &instance_dir, &state.http)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Install the mod loader if needed
     let base_dir = crate::utils::paths::data_dir();
@@ -462,11 +463,11 @@ pub async fn install_mod_from_curseforge(
     mod_id: String,
     game_version: String,
     loader: String,
-) -> Result<InstalledModInfo, String> {
+) -> Result<InstalledModInfo, AppError> {
     let api_key = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::settings::get_curseforge_api_key(&db)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("CurseForge API key not configured")?
     };
 
@@ -474,11 +475,11 @@ pub async fn install_mod_from_curseforge(
 
     // Check if already installed
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         if db::mods::is_mod_installed(&db, &instance_id, &mod_id, "curseforge")
-            .map_err(|e| e.to_string())?
+            ?
         {
-            return Err("Mod is already installed".to_string());
+            return Err(AppError::Internal("Mod is already installed".to_string()));
         }
     }
 
@@ -492,7 +493,7 @@ pub async fn install_mod_from_curseforge(
         10,
     )
     .await
-    .map_err(|e| e.to_string())?;
+    ?;
 
     let file = files
         .iter()
@@ -508,20 +509,20 @@ pub async fn install_mod_from_curseforge(
     let mods_dir = crate::utils::paths::instances_dir()
         .join(&instance_id)
         .join("mods");
-    std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&mods_dir)?;
 
     let dest = mods_dir.join(&file.file_name);
     minecraft::download_file(Some(&state.http), download_url, &dest)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Get mod name
     let mod_info = curseforge::get_mod(&api_key, cf_mod_id)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Record in database
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     db::mods::record_mod_install(
         &db,
         &instance_id,
@@ -531,7 +532,7 @@ pub async fn install_mod_from_curseforge(
         file.display_name.as_deref().unwrap_or(&file.file_name),
         &file.file_name,
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(InstalledModInfo {
         id: 0,
@@ -560,7 +561,7 @@ pub async fn install_mod(
     project_id: String,
     game_version: String,
     loader: String,
-) -> Result<InstalledModInfo, String> {
+) -> Result<InstalledModInfo, AppError> {
     match source.as_str() {
         "modrinth" => {
             install_mod_from_modrinth(state, instance_id, project_id, game_version, loader).await
@@ -568,7 +569,7 @@ pub async fn install_mod(
         "curseforge" => {
             install_mod_from_curseforge(state, instance_id, project_id, game_version, loader).await
         }
-        _ => Err(format!("Unknown mod source: {}", source)),
+        _ => Err(AppError::Internal(format!("Unknown mod source: {}", source))),
     }
 }
 
@@ -580,10 +581,10 @@ pub async fn get_modrinth_versions(
     project_id: String,
     game_version: String,
     loader: String,
-) -> Result<Vec<ModVersionInfo>, String> {
+) -> Result<Vec<ModVersionInfo>, AppError> {
     let versions = modrinth::get_project_versions(&project_id, Some(&loader), Some(&game_version))
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(versions
         .into_iter()
@@ -607,11 +608,11 @@ pub async fn get_curseforge_versions(
     mod_id: String,
     game_version: String,
     loader: String,
-) -> Result<Vec<ModVersionInfo>, String> {
+) -> Result<Vec<ModVersionInfo>, AppError> {
     let api_key = {
-        let db_lock = state.db.lock().map_err(|e| e.to_string())?;
+        let db_lock = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::settings::get_curseforge_api_key(&db_lock)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("CurseForge API key not configured")?
     };
 
@@ -626,7 +627,7 @@ pub async fn get_curseforge_versions(
         20,
     )
     .await
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(files
         .into_iter()
@@ -674,10 +675,10 @@ pub struct ModUpdateInfo {
 pub async fn check_mod_updates(
     state: State<'_, AppState>,
     instance_id: String,
-) -> Result<Vec<ModUpdateInfo>, String> {
+) -> Result<Vec<ModUpdateInfo>, AppError> {
     let installed = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        db::mods::get_instance_mods(&db, &instance_id)?
     };
 
     let mut updates = Vec::new();

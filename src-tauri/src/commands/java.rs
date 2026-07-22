@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::java;
 use serde::Serialize;
 
@@ -21,10 +22,10 @@ pub fn get_required_java_version(mc_version: String) -> u32 {
 pub async fn ensure_java_for_mc(
     mc_version: String,
     custom_path: Option<String>,
-) -> Result<JavaCheckResult, String> {
+) -> Result<JavaCheckResult, AppError> {
     let path = java::ensure_java(&mc_version, custom_path.as_deref())
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let major = java::java_version_for_mc(&mc_version);
     let auto_downloaded = java::is_java_installed(major)
@@ -42,9 +43,9 @@ pub async fn ensure_java_for_mc(
 
 /// Download a specific Java version (explicit user action).
 #[tauri::command]
-pub async fn download_java_version(java_major: u32) -> Result<String, String> {
+pub async fn download_java_version(java_major: u32) -> Result<String, AppError> {
     let path = java::download_java(java_major)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(path.to_string_lossy().to_string())
 }

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::Serialize;
 
 /// Info about a log file.
@@ -19,7 +20,7 @@ pub struct LogCursor {
 
 /// List all log files for an instance.
 #[tauri::command]
-pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, String> {
+pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, AppError> {
     let logs_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -32,15 +33,15 @@ pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, Stri
     let mut files = Vec::new();
     let mut entries = tokio::fs::read_dir(&logs_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if !path.is_file() {
             continue;
         }
 
-        let metadata = entry.metadata().await.map_err(|e| e.to_string())?;
+        let metadata = entry.metadata().await?;
         let filename = entry.file_name().to_string_lossy().to_string();
 
         let log_type = if filename == "latest.log" {
@@ -81,7 +82,7 @@ pub async fn read_log_cursor(
     filename: String,
     cursor: u64,
     max_bytes: Option<u64>,
-) -> Result<LogCursor, String> {
+) -> Result<LogCursor, AppError> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -98,7 +99,7 @@ pub async fn read_log_cursor(
 
     let data = tokio::fs::read(&log_path)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let file_len = data.len() as u64;
     let max = max_bytes.unwrap_or(64 * 1024); // Default 64KB chunks
@@ -126,7 +127,7 @@ pub async fn read_log_cursor(
 
 /// Read the full content of a log file.
 #[tauri::command]
-pub async fn read_log_file(instance_id: String, filename: String) -> Result<String, String> {
+pub async fn read_log_file(instance_id: String, filename: String) -> Result<String, AppError> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -134,17 +135,15 @@ pub async fn read_log_file(instance_id: String, filename: String) -> Result<Stri
         .join(&filename);
 
     if !log_path.exists() {
-        return Err("Log file not found".to_string());
+        return Err(AppError::Internal("Log file not found".to_string()));
     }
 
-    tokio::fs::read_to_string(&log_path)
-        .await
-        .map_err(|e| e.to_string())
+    Ok(tokio::fs::read_to_string(&log_path).await?)
 }
 
 /// Delete a specific log file.
 #[tauri::command]
-pub async fn delete_log_file(instance_id: String, filename: String) -> Result<(), String> {
+pub async fn delete_log_file(instance_id: String, filename: String) -> Result<(), AppError> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -152,19 +151,19 @@ pub async fn delete_log_file(instance_id: String, filename: String) -> Result<()
         .join(&filename);
 
     if !log_path.exists() {
-        return Err("Log file not found".to_string());
+        return Err(AppError::Internal("Log file not found".to_string()));
     }
 
     tokio::fs::remove_file(&log_path)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(())
 }
 
 /// Delete all log files for an instance.
 #[tauri::command]
-pub async fn delete_all_logs(instance_id: String) -> Result<u32, String> {
+pub async fn delete_all_logs(instance_id: String) -> Result<u32, AppError> {
     let logs_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -177,13 +176,13 @@ pub async fn delete_all_logs(instance_id: String) -> Result<u32, String> {
     let mut count = 0u32;
     let mut entries = tokio::fs::read_dir(&logs_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         if entry.path().is_file() {
             tokio::fs::remove_file(entry.path())
                 .await
-                .map_err(|e| e.to_string())?;
+                ?;
             count += 1;
         }
     }
@@ -193,7 +192,7 @@ pub async fn delete_all_logs(instance_id: String) -> Result<u32, String> {
 
 /// Get log file size.
 #[tauri::command]
-pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, String> {
+pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, AppError> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -206,7 +205,7 @@ pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, 
 
     let metadata = tokio::fs::metadata(&log_path)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(metadata.len())
 }

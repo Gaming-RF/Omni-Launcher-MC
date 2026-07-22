@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::Serialize;
 
 /// A Minecraft skin with metadata.
@@ -14,16 +15,16 @@ pub async fn upload_skin(
     _account_uuid: String,
     _skin_data: Vec<u8>,
     _variant: String,
-) -> Result<SkinInfo, String> {
+) -> Result<SkinInfo, AppError> {
     // This requires Mojang API authentication
     // POST https://api.minecraftservices.com/minecraft/profile/skins
     // with multipart form data (file + variant)
-    Err("Skin upload requires Microsoft authentication. Please sign in first.".to_string())
+    Err(AppError::Internal("Skin upload requires Microsoft authentication. Please sign in first.".to_string()))
 }
 
 /// Get the current skin info for an account.
 #[tauri::command]
-pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, String> {
+pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, AppError> {
     // Fetch from Mojang session API
     let url = format!(
         "https://sessionserver.mojang.com/session/minecraft/profile/{}",
@@ -31,13 +32,13 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, String> {
     );
 
     let client = reqwest::Client::new();
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await?;
 
     if !resp.status().is_success() {
-        return Err(format!("Failed to fetch profile: {}", resp.status()));
+        return Err(AppError::Internal(format!("Failed to fetch profile: {}", resp.status())));
     }
 
-    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let body: serde_json::Value = resp.json().await?;
 
     let mut skin_url = None;
     let mut variant = "classic".to_string();
@@ -80,14 +81,14 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, String> {
 
 /// Reset to the default Steve/Alex skin.
 #[tauri::command]
-pub async fn reset_skin(_account_uuid: String) -> Result<(), String> {
+pub async fn reset_skin(_account_uuid: String) -> Result<(), AppError> {
     // DELETE https://api.minecraftservices.com/minecraft/profile/skins
-    Err("Skin reset requires Microsoft authentication.".to_string())
+    Err(AppError::Internal("Skin reset requires Microsoft authentication.".to_string()))
 }
 
 /// Get available capes for an account.
 #[tauri::command]
-pub async fn get_capes(_account_uuid: String) -> Result<Vec<CapeInfo>, String> {
+pub async fn get_capes(_account_uuid: String) -> Result<Vec<CapeInfo>, AppError> {
     // GET https://api.minecraftservices.com/minecraft/profile/capes
     Ok(vec![])
 }

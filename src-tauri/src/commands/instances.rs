@@ -1,4 +1,5 @@
 use crate::db;
+use crate::error::AppError;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -29,9 +30,9 @@ pub struct CreateInstancePayload {
 }
 
 #[tauri::command]
-pub fn get_instances(state: State<'_, AppState>) -> Result<Vec<InstanceListItem>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    let instances = db::instances::get_all_instances(&db).map_err(|e| e.to_string())?;
+pub fn get_instances(state: State<'_, AppState>) -> Result<Vec<InstanceListItem>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let instances = db::instances::get_all_instances(&db)?;
 
     Ok(instances
         .into_iter()
@@ -54,8 +55,8 @@ pub fn get_instances(state: State<'_, AppState>) -> Result<Vec<InstanceListItem>
 pub fn create_instance(
     state: State<'_, AppState>,
     payload: CreateInstancePayload,
-) -> Result<InstanceListItem, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<InstanceListItem, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let instance = db::instances::create_instance(
         &db,
         db::instances::CreateInstanceParams {
@@ -68,7 +69,7 @@ pub fn create_instance(
             allocated_memory_mb: payload.allocated_memory_mb,
         },
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(InstanceListItem {
         id: instance.id,
@@ -85,9 +86,9 @@ pub fn create_instance(
 }
 
 #[tauri::command]
-pub fn delete_instance(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db::instances::delete_instance(&db, &id).map_err(|e| e.to_string())?;
+pub fn delete_instance(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    db::instances::delete_instance(&db, &id)?;
     Ok(())
 }
 
@@ -99,11 +100,11 @@ pub fn update_instance(
     java_args: Option<String>,
     allocated_memory_mb: Option<i64>,
     notes: Option<String>,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut instance = db::instances::get_instance(&db, &id)
-        .map_err(|e| e.to_string())?
-        .ok_or("Instance not found")?;
+        ?
+        .ok_or_else(|| AppError::NotFound("Instance not found".into()))?;
 
     if let Some(n) = name {
         instance.name = n;
@@ -118,7 +119,7 @@ pub fn update_instance(
         instance.notes = notes;
     }
 
-    db::instances::update_instance(&db, &instance).map_err(|e| e.to_string())?;
+    db::instances::update_instance(&db, &instance)?;
     Ok(())
 }
 
@@ -132,21 +133,21 @@ pub struct SettingsInfo {
 }
 
 #[tauri::command]
-pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsInfo, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsInfo, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(SettingsInfo {
         default_memory_mb: db::settings::get_setting(&db, "default_memory_mb")
-            .map_err(|e| e.to_string())?
+            ?
             .unwrap_or_else(|| "4096".to_string()),
         theme: db::settings::get_setting(&db, "theme")
-            .map_err(|e| e.to_string())?
+            ?
             .unwrap_or_else(|| "dark".to_string()),
         language: db::settings::get_setting(&db, "language")
-            .map_err(|e| e.to_string())?
+            ?
             .unwrap_or_else(|| "en".to_string()),
-        java_path: db::settings::get_setting(&db, "java_path").map_err(|e| e.to_string())?,
+        java_path: db::settings::get_setting(&db, "java_path")?,
         curseforge_api_key: db::settings::get_setting(&db, "curseforge_api_key")
-            .map_err(|e| e.to_string())?,
+            ?,
     })
 }
 
@@ -155,9 +156,9 @@ pub fn update_setting(
     state: State<'_, AppState>,
     key: String,
     value: String,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db::settings::set_setting(&db, &key, &value).map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    db::settings::set_setting(&db, &key, &value)?;
     Ok(())
 }
 
@@ -166,19 +167,19 @@ pub async fn duplicate_instance(
     state: State<'_, AppState>,
     instance_id: String,
     new_name: String,
-) -> Result<InstanceListItem, String> {
+) -> Result<InstanceListItem, AppError> {
     let (original, mods) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let original = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
-            .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+            ?
+            .ok_or_else(|| AppError::NotFound("Instance not found".into()))?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id)?;
         (original, mods)
     };
 
     // Create new instance in DB with same settings
     let new_instance = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::create_instance(
             &db,
             db::instances::CreateInstanceParams {
@@ -191,7 +192,7 @@ pub async fn duplicate_instance(
                 allocated_memory_mb: original.allocated_memory_mb,
             },
         )
-        .map_err(|e| e.to_string())?
+        ?
     };
 
     // Copy instance directory
@@ -199,12 +200,12 @@ pub async fn duplicate_instance(
     let src = base.join("instances").join(&instance_id);
     let dst = base.join("instances").join(&new_instance.id);
     if src.exists() {
-        copy_dir_all(&src, &dst).map_err(|e| e.to_string())?;
+        copy_dir_all(&src, &dst)?;
     }
 
     // Copy mods to DB
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         for m in mods {
             db::mods::record_mod_install(
                 &db,
@@ -279,13 +280,13 @@ pub struct ImportPayload {
 pub fn export_instance_share(
     state: State<'_, AppState>,
     instance_id: String,
-) -> Result<ShareCode, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<ShareCode, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let instance = db::instances::get_instance(&db, &instance_id)
-        .map_err(|e| e.to_string())?
-        .ok_or("Instance not found")?;
+        ?
+        .ok_or_else(|| AppError::NotFound("Instance not found".into()))?;
 
-    let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+    let mods = db::mods::get_instance_mods(&db, &instance_id)?;
 
     let share = SharePayload {
         name: instance.name.clone(),
@@ -297,7 +298,7 @@ pub fn export_instance_share(
         allocated_memory_mb: instance.allocated_memory_mb,
     };
 
-    let json = serde_json::to_string(&share).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(&share)?;
     let code = format!("OMC:{}", B64.encode(json.as_bytes()));
 
     Ok(ShareCode {
@@ -312,11 +313,11 @@ pub fn export_instance_share(
 pub fn import_instance_share(
     state: State<'_, AppState>,
     payload: ImportPayload,
-) -> Result<InstanceListItem, String> {
+) -> Result<InstanceListItem, AppError> {
     let code = payload
         .code
         .strip_prefix("OMC:")
-        .ok_or("Invalid share code: must start with OMC:")?;
+        .ok_or_else(|| AppError::Validation("Invalid share code: must start with OMC:".into()))?;
 
     let bytes = B64
         .decode(code)
@@ -342,7 +343,7 @@ pub fn import_instance_share(
     };
     let truncated_name = format!("{}{}", base_name, suffix);
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let instance = db::instances::create_instance(
         &db,
         db::instances::CreateInstanceParams {
@@ -355,7 +356,7 @@ pub fn import_instance_share(
             allocated_memory_mb: share.allocated_memory_mb,
         },
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(InstanceListItem {
         id: instance.id,

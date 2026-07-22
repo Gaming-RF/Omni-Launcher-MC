@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::paths::data_dir;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
@@ -115,7 +116,7 @@ fn find_usage(item_type: &str, hash_dir: &str) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn list_library_items(item_type: Option<String>) -> Result<Vec<LibraryItem>, String> {
+pub fn list_library_items(item_type: Option<String>) -> Result<Vec<LibraryItem>, AppError> {
     let types: Vec<&str> = if let Some(ref t) = item_type {
         vec![t.as_str()]
     } else {
@@ -130,7 +131,7 @@ pub fn list_library_items(item_type: Option<String>) -> Result<Vec<LibraryItem>,
 }
 
 #[tauri::command]
-pub fn import_to_library(instance_id: String, file_name: String) -> Result<LibraryItem, String> {
+pub fn import_to_library(instance_id: String, file_name: String) -> Result<LibraryItem, AppError> {
     let instances = data_dir().join("instances").join(&instance_id);
     // Try mods/, resourcepacks/, shaderpacks/
     let (src_path, item_type) = [
@@ -150,17 +151,17 @@ pub fn import_to_library(instance_id: String, file_name: String) -> Result<Libra
     .ok_or_else(|| format!("File not found in instance: {}", file_name))?;
 
     // Compute hash
-    let bytes = fs::read(&src_path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&src_path)?;
     let mut hasher = Sha1::new();
     hasher.update(&bytes);
     let hash = format!("{:x}", hasher.finalize());
 
     // Create library entry
     let lib_dir = library_dir().join(item_type).join(&hash);
-    fs::create_dir_all(&lib_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&lib_dir)?;
     let dest = lib_dir.join(&file_name);
     if !dest.exists() {
-        fs::copy(&src_path, &dest).map_err(|e| e.to_string())?;
+        fs::copy(&src_path, &dest)?;
     }
     // Write meta
     let meta = serde_json::json!({
@@ -168,18 +169,16 @@ pub fn import_to_library(instance_id: String, file_name: String) -> Result<Libra
         "added_at": chrono::Utc::now().to_rfc3339(),
         "source": "manual",
     });
-    fs::write(
-        lib_dir.join("meta.json"),
-        serde_json::to_string_pretty(&meta).unwrap(),
-    )
-    .ok();
+    let meta_json =
+        serde_json::to_string_pretty(&meta).map_err(|e| format!("Failed to serialize metadata: {e}"))?;
+    fs::write(lib_dir.join("meta.json"), meta_json).ok();
 
     // Replace original with symlink
-    fs::remove_file(&src_path).map_err(|e| e.to_string())?;
+    fs::remove_file(&src_path)?;
     #[cfg(unix)]
-    std::os::unix::fs::symlink(&dest, &src_path).map_err(|e| e.to_string())?;
+    std::os::unix::fs::symlink(&dest, &src_path)?;
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(&dest, &src_path).map_err(|e| e.to_string())?;
+    std::os::windows::fs::symlink_file(&dest, &src_path)?;
 
     let size = fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
     Ok(LibraryItem {
@@ -202,10 +201,10 @@ pub fn link_library_to_instance(
     library_id: String,
     instance_id: String,
     item_type: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let lib_dir = library_dir().join(&item_type).join(&library_id);
     let file = fs::read_dir(&lib_dir)
-        .map_err(|e| e.to_string())?
+        ?
         .flatten()
         .find(|e| e.file_name() != "meta.json")
         .ok_or("No file in library item")?;
@@ -214,20 +213,20 @@ pub fn link_library_to_instance(
         "mods" => "mods",
         "resourcepacks" => "resourcepacks",
         "shaderpacks" => "shaderpacks",
-        _ => return Err("Invalid type".into()),
+        _ => return Err(AppError::Validation("Invalid type".into())),
     };
     let target_dir = data_dir()
         .join("instances")
         .join(&instance_id)
         .join(".minecraft")
         .join(sub);
-    fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&target_dir)?;
     let link = target_dir.join(file.file_name());
     if !link.exists() {
         #[cfg(unix)]
-        std::os::unix::fs::symlink(file.path(), &link).map_err(|e| e.to_string())?;
+        std::os::unix::fs::symlink(file.path(), &link)?;
         #[cfg(windows)]
-        std::os::windows::fs::symlink_file(file.path(), &link).map_err(|e| e.to_string())?;
+        std::os::windows::fs::symlink_file(file.path(), &link)?;
     }
     Ok(())
 }
@@ -238,12 +237,12 @@ pub fn unlink_library_from_instance(
     instance_id: String,
     item_type: String,
     file_name: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let sub = match item_type.as_str() {
         "mods" => "mods",
         "resourcepacks" => "resourcepacks",
         "shaderpacks" => "shaderpacks",
-        _ => return Err("Invalid type".into()),
+        _ => return Err(AppError::Validation("Invalid type".into())),
     };
     let link = data_dir()
         .join("instances")
@@ -252,13 +251,13 @@ pub fn unlink_library_from_instance(
         .join(sub)
         .join(&file_name);
     if link.is_symlink() {
-        fs::remove_file(&link).map_err(|e| e.to_string())?;
+        fs::remove_file(&link)?;
     }
     Ok(())
 }
 
 #[tauri::command]
-pub fn cleanup_library() -> Result<(u64, u64), String> {
+pub fn cleanup_library() -> Result<(u64, u64), AppError> {
     let mut removed = 0u64;
     let mut freed = 0u64;
     for item_type in &["mods", "resourcepacks", "shaderpacks"] {

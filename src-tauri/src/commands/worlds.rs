@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::Serialize;
 
 /// A Minecraft server in the server list.
@@ -31,7 +32,7 @@ pub struct WorldsInfo {
 
 /// Get servers and singleplayer worlds for an instance.
 #[tauri::command]
-pub async fn get_instance_worlds(instance_id: String) -> Result<WorldsInfo, String> {
+pub async fn get_instance_worlds(instance_id: String) -> Result<WorldsInfo, AppError> {
     let instance_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id);
@@ -51,7 +52,7 @@ pub async fn add_server(
     instance_id: String,
     name: String,
     address: String,
-) -> Result<ServerEntry, String> {
+) -> Result<ServerEntry, AppError> {
     let servers_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -80,7 +81,7 @@ pub async fn edit_server(
     index: usize,
     name: String,
     address: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let servers_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -89,7 +90,7 @@ pub async fn edit_server(
     let mut servers = parse_servers_dat(&servers_path).await.unwrap_or_default();
 
     if index >= servers.len() {
-        return Err("Server index out of range".to_string());
+        return Err(AppError::Internal("Server index out of range".to_string()));
     }
 
     servers[index].name = name;
@@ -101,7 +102,7 @@ pub async fn edit_server(
 
 /// Remove a server from the list.
 #[tauri::command]
-pub async fn remove_server(instance_id: String, index: usize) -> Result<(), String> {
+pub async fn remove_server(instance_id: String, index: usize) -> Result<(), AppError> {
     let servers_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -110,7 +111,7 @@ pub async fn remove_server(instance_id: String, index: usize) -> Result<(), Stri
     let mut servers = parse_servers_dat(&servers_path).await.unwrap_or_default();
 
     if index >= servers.len() {
-        return Err("Server index out of range".to_string());
+        return Err(AppError::Internal("Server index out of range".to_string()));
     }
 
     servers.remove(index);
@@ -121,7 +122,7 @@ pub async fn remove_server(instance_id: String, index: usize) -> Result<(), Stri
 
 /// Ping a Minecraft server for status.
 #[tauri::command]
-pub async fn ping_server(address: String) -> Result<ServerStatus, String> {
+pub async fn ping_server(address: String) -> Result<ServerStatus, AppError> {
     use std::net::TcpStream;
     use std::time::Duration;
 
@@ -142,10 +143,10 @@ pub async fn ping_server(address: String) -> Result<ServerStatus, String> {
 
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
-        .map_err(|e| e.to_string())?;
+        ?;
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // For now, just check connectivity. Full SLP protocol would require
     // varint encoding, handshake packet, etc.
@@ -171,7 +172,7 @@ pub struct ServerStatus {
 
 /// Delete a singleplayer world.
 #[tauri::command]
-pub async fn delete_world(instance_id: String, folder_name: String) -> Result<(), String> {
+pub async fn delete_world(instance_id: String, folder_name: String) -> Result<(), AppError> {
     let world_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -179,12 +180,12 @@ pub async fn delete_world(instance_id: String, folder_name: String) -> Result<()
         .join(&folder_name);
 
     if !world_path.exists() {
-        return Err("World not found".to_string());
+        return Err(AppError::Internal("World not found".to_string()));
     }
 
     tokio::fs::remove_dir_all(&world_path)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(())
 }
@@ -195,7 +196,7 @@ pub async fn rename_world(
     instance_id: String,
     folder_name: String,
     _new_name: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let level_dat = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -204,7 +205,7 @@ pub async fn rename_world(
         .join("level.dat");
 
     if !level_dat.exists() {
-        return Err("World not found (no level.dat)".to_string());
+        return Err(AppError::Internal("World not found (no level.dat)".to_string()));
     }
 
     // We can't easily rename via level.dat (NBT format), so we store the display name
@@ -215,7 +216,7 @@ pub async fn rename_world(
 
 /// Backup a singleplayer world by copying its folder.
 #[tauri::command]
-pub async fn backup_world(instance_id: String, folder_name: String) -> Result<String, String> {
+pub async fn backup_world(instance_id: String, folder_name: String) -> Result<String, AppError> {
     let saves_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -223,7 +224,7 @@ pub async fn backup_world(instance_id: String, folder_name: String) -> Result<St
 
     let world_dir = saves_dir.join(&folder_name);
     if !world_dir.exists() {
-        return Err("World not found".to_string());
+        return Err(AppError::Internal("World not found".to_string()));
     }
 
     let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
@@ -232,13 +233,13 @@ pub async fn backup_world(instance_id: String, folder_name: String) -> Result<St
 
     copy_dir_recursive(&world_dir, &backup_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(backup_name)
 }
 
 /// Parse servers.dat (NBT format). Returns empty vec if file doesn't exist.
-async fn parse_servers_dat(path: &std::path::Path) -> Result<Vec<ServerEntry>, String> {
+async fn parse_servers_dat(path: &std::path::Path) -> Result<Vec<ServerEntry>, AppError> {
     if !path.exists() {
         return Ok(vec![]);
     }
@@ -246,7 +247,7 @@ async fn parse_servers_dat(path: &std::path::Path) -> Result<Vec<ServerEntry>, S
     // servers.dat is NBT format. For a basic implementation, we'll try to parse
     // with the simple_nbt crate or fall back to empty.
     // The NBT structure is: {servers: [{name: "", ip: "", ...}, ...]}
-    let data = tokio::fs::read(path).await.map_err(|e| e.to_string())?;
+    let data = tokio::fs::read(path).await?;
 
     // Try to parse as NBT
     match parse_servers_nbt(&data) {
@@ -469,7 +470,7 @@ fn read_nbt_string(reader: &mut std::io::Cursor<&Vec<u8>>) -> Option<String> {
 }
 
 /// Write servers.dat in NBT format.
-async fn write_servers_dat(path: &std::path::Path, servers: &[ServerEntry]) -> Result<(), String> {
+async fn write_servers_dat(path: &std::path::Path, servers: &[ServerEntry]) -> Result<(), AppError> {
     // Build NBT data manually
     let mut nbt_data = Vec::new();
 
@@ -501,12 +502,12 @@ async fn write_servers_dat(path: &std::path::Path, servers: &[ServerEntry]) -> R
     use std::io::Write;
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(&nbt_data).map_err(|e| e.to_string())?;
-    let compressed = encoder.finish().map_err(|e| e.to_string())?;
+    encoder.write_all(&nbt_data)?;
+    let compressed = encoder.finish()?;
 
     tokio::fs::write(path, compressed)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(())
 }
@@ -526,7 +527,7 @@ fn write_nbt_string_tag(data: &mut Vec<u8>, name: &str, value: &str) {
 /// Scan singleplayer worlds in the saves directory.
 async fn scan_singleplayer_worlds(
     saves_dir: &std::path::Path,
-) -> Result<Vec<SingleplayerWorld>, String> {
+) -> Result<Vec<SingleplayerWorld>, AppError> {
     if !saves_dir.exists() {
         return Ok(vec![]);
     }
@@ -534,9 +535,9 @@ async fn scan_singleplayer_worlds(
     let mut worlds = Vec::new();
     let mut entries = tokio::fs::read_dir(saves_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
         if !path.is_dir() {
             continue;

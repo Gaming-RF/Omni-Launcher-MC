@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -12,12 +13,12 @@ pub struct RunningInstanceInfo {
 #[tauri::command]
 pub fn get_all_running_instances(
     state: State<'_, AppState>,
-) -> Result<Vec<RunningInstanceInfo>, String> {
+) -> Result<Vec<RunningInstanceInfo>, AppError> {
     let ids = state.process_manager.running_instances();
     let mut result = Vec::new();
     for id in ids {
         let name = {
-            let db = state.db.lock().map_err(|e| e.to_string())?;
+            let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
             crate::db::instances::get_instance(&db, &id)
                 .ok()
                 .flatten()
@@ -34,12 +35,13 @@ pub fn get_all_running_instances(
 }
 
 #[tauri::command]
-pub fn terminate_instance(state: State<'_, AppState>, instance_id: String) -> Result<(), String> {
-    state.process_manager.kill(&instance_id)
+pub fn terminate_instance(state: State<'_, AppState>, instance_id: String) -> Result<(), AppError> {
+    state.process_manager.kill(&instance_id).map_err(AppError::Internal)?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn terminate_all_instances(state: State<'_, AppState>) -> Result<u32, String> {
+pub fn terminate_all_instances(state: State<'_, AppState>) -> Result<u32, AppError> {
     let ids = state.process_manager.running_instances();
     let count = ids.len() as u32;
     for id in ids {

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 // Unified platform commands — search, versions, details from both Modrinth + CurseForge
 
 use crate::platforms::{self, ModSource, ResourceType, SortOrder, UnifiedSearchRequest};
@@ -18,7 +19,7 @@ pub struct PlatformSearchArgs {
 
 /// Unified search across Modrinth and CurseForge
 #[command]
-pub async fn search_mods_unified(args: PlatformSearchArgs) -> Result<String, String> {
+pub async fn search_mods_unified(args: PlatformSearchArgs) -> Result<String, AppError> {
     let source = args.source.as_deref().map(|s| match s {
         "modrinth" => ModSource::Modrinth,
         "curseforge" => ModSource::CurseForge,
@@ -55,9 +56,9 @@ pub async fn search_mods_unified(args: PlatformSearchArgs) -> Result<String, Str
 
     let resp = platforms::search_unified(&req)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    serde_json::to_string(&resp).map_err(|e| e.to_string())
+    Ok(serde_json::to_string(&resp)?)
 }
 
 /// Get versions for a project from a specific source
@@ -67,11 +68,11 @@ pub async fn get_mod_versions_unified(
     project_id: String,
     game_version: Option<String>,
     loader: Option<String>,
-) -> Result<String, String> {
+) -> Result<String, AppError> {
     let src = match source.as_str() {
         "modrinth" => ModSource::Modrinth,
         "curseforge" => ModSource::CurseForge,
-        _ => return Err("Invalid source".to_string()),
+        _ => return Err(AppError::Internal("Invalid source".to_string())),
     };
 
     let versions = platforms::get_project_versions(
@@ -81,23 +82,23 @@ pub async fn get_mod_versions_unified(
         loader.as_deref(),
     )
     .await
-    .map_err(|e| e.to_string())?;
+    ?;
 
-    serde_json::to_string(&versions).map_err(|e| e.to_string())
+    Ok(serde_json::to_string(&versions)?)
 }
 
 /// Get project details from a specific source
 #[command]
-pub async fn get_mod_details_unified(source: String, project_id: String) -> Result<String, String> {
+pub async fn get_mod_details_unified(source: String, project_id: String) -> Result<String, AppError> {
     let src = match source.as_str() {
         "modrinth" => ModSource::Modrinth,
         "curseforge" => ModSource::CurseForge,
-        _ => return Err("Invalid source".to_string()),
+        _ => return Err(AppError::Internal("Invalid source".to_string())),
     };
 
     let details = platforms::get_project_details(&src, &project_id)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    serde_json::to_string(&details).map_err(|e| e.to_string())
+    Ok(serde_json::to_string(&details)?)
 }

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::commands::instances::InstanceListItem;
 use crate::AppState;
 use serde::Serialize;
@@ -36,7 +37,7 @@ fn join_groups(groups: &[String]) -> Option<String> {
 
 /// Create the instance_groups table if it doesn't exist.
 /// Called lazily from commands so we don't need to touch migrations.rs.
-fn ensure_groups_table(db: &rusqlite::Connection) -> Result<(), String> {
+fn ensure_groups_table(db: &rusqlite::Connection) -> Result<(), AppError> {
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS instance_groups (
             name TEXT PRIMARY KEY NOT NULL,
@@ -44,14 +45,15 @@ fn ensure_groups_table(db: &rusqlite::Connection) -> Result<(), String> {
             created_at TEXT NOT NULL
         );",
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
 // ── Commands ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn list_groups(state: State<'_, AppState>) -> Result<Vec<GroupInfo>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn list_groups(state: State<'_, AppState>) -> Result<Vec<GroupInfo>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     ensure_groups_table(&db)?;
 
     let mut stmt = db
@@ -65,7 +67,7 @@ pub fn list_groups(state: State<'_, AppState>) -> Result<Vec<GroupInfo>, String>
              GROUP BY g.name
              ORDER BY g.name",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let groups = stmt
         .query_map([], |row| {
@@ -76,9 +78,9 @@ pub fn list_groups(state: State<'_, AppState>) -> Result<Vec<GroupInfo>, String>
                 instance_count: row.get(3)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(groups)
 }
@@ -88,13 +90,13 @@ pub fn create_group(
     state: State<'_, AppState>,
     name: String,
     color: Option<String>,
-) -> Result<GroupInfo, String> {
+) -> Result<GroupInfo, AppError> {
     let name = name.trim().to_string();
     if name.is_empty() {
-        return Err("Group name cannot be empty".to_string());
+        return Err(AppError::Internal("Group name cannot be empty".to_string()));
     }
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     ensure_groups_table(&db)?;
 
     let color = color.unwrap_or_else(|| "#6366f1".to_string());
@@ -121,8 +123,8 @@ pub fn create_group(
 }
 
 #[tauri::command]
-pub fn delete_group(state: State<'_, AppState>, name: String) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn delete_group(state: State<'_, AppState>, name: String) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     ensure_groups_table(&db)?;
 
     // Delete the group itself
@@ -130,18 +132,18 @@ pub fn delete_group(state: State<'_, AppState>, name: String) -> Result<(), Stri
         "DELETE FROM instance_groups WHERE name = ?1",
         rusqlite::params![name],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     // Clear this group from all instances
     let mut stmt = db
         .prepare("SELECT id, groups FROM instances WHERE groups IS NOT NULL AND groups != ''")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows: Vec<(String, Option<String>)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for (id, groups_raw) in rows {
         let mut groups = parse_groups(&groups_raw);
@@ -152,7 +154,7 @@ pub fn delete_group(state: State<'_, AppState>, name: String) -> Result<(), Stri
                 "UPDATE instances SET groups = ?1 WHERE id = ?2",
                 rusqlite::params![new_groups, id],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
@@ -164,13 +166,13 @@ pub fn rename_group(
     state: State<'_, AppState>,
     old_name: String,
     new_name: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let new_name = new_name.trim().to_string();
     if new_name.is_empty() {
-        return Err("New group name cannot be empty".to_string());
+        return Err(AppError::Internal("New group name cannot be empty".to_string()));
     }
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     ensure_groups_table(&db)?;
 
     // Update the group row
@@ -188,19 +190,19 @@ pub fn rename_group(
         })?;
 
     if changed == 0 {
-        return Err(format!("Group '{}' not found", old_name));
+        return Err(AppError::Internal(format!("Group '{}' not found", old_name)));
     }
 
     // Update all instances that reference this group
     let mut stmt = db
         .prepare("SELECT id, groups FROM instances WHERE groups IS NOT NULL AND groups != ''")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows: Vec<(String, Option<String>)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for (id, groups_raw) in rows {
         let mut groups = parse_groups(&groups_raw);
@@ -211,7 +213,7 @@ pub fn rename_group(
                 "UPDATE instances SET groups = ?1 WHERE id = ?2",
                 rusqlite::params![new_groups, id],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
@@ -223,8 +225,8 @@ pub fn update_group_color(
     state: State<'_, AppState>,
     name: String,
     color: String,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     ensure_groups_table(&db)?;
 
     let changed = db
@@ -232,10 +234,10 @@ pub fn update_group_color(
             "UPDATE instance_groups SET color = ?1 WHERE name = ?2",
             rusqlite::params![color, name],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     if changed == 0 {
-        return Err(format!("Group '{}' not found", name));
+        return Err(AppError::Internal(format!("Group '{}' not found", name)));
     }
 
     Ok(())
@@ -246,8 +248,8 @@ pub fn assign_instance_to_group(
     state: State<'_, AppState>,
     instance_id: String,
     group_name: String,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
     let current: Option<String> = db
         .query_row(
@@ -255,7 +257,7 @@ pub fn assign_instance_to_group(
             rusqlite::params![instance_id],
             |row| row.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut groups = parse_groups(&current);
     if !groups.contains(&group_name) {
@@ -267,7 +269,7 @@ pub fn assign_instance_to_group(
         "UPDATE instances SET groups = ?1 WHERE id = ?2",
         rusqlite::params![new_groups, instance_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
@@ -277,8 +279,8 @@ pub fn remove_instance_from_group(
     state: State<'_, AppState>,
     instance_id: String,
     group_name: String,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
     let current: Option<String> = db
         .query_row(
@@ -286,7 +288,7 @@ pub fn remove_instance_from_group(
             rusqlite::params![instance_id],
             |row| row.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut groups = parse_groups(&current);
     groups.retain(|g| g != &group_name);
@@ -296,7 +298,7 @@ pub fn remove_instance_from_group(
         "UPDATE instances SET groups = ?1 WHERE id = ?2",
         rusqlite::params![new_groups, instance_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
@@ -305,8 +307,8 @@ pub fn remove_instance_from_group(
 pub fn get_group_instances(
     state: State<'_, AppState>,
     group_name: String,
-) -> Result<Vec<InstanceListItem>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<Vec<InstanceListItem>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut stmt = db
         .prepare(
@@ -317,7 +319,7 @@ pub fn get_group_instances(
                AND (',' || groups || ',') LIKE ('%,' || ?1 || ',%')
              ORDER BY last_played DESC NULLS LAST, created_at DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let instances = stmt
         .query_map(rusqlite::params![group_name], |row| {
@@ -334,9 +336,9 @@ pub fn get_group_instances(
                 allocated_memory_mb: row.get(9)?,
             })
         })
-        .map_err(|e| e.to_string())?
+        ?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(instances)
 }

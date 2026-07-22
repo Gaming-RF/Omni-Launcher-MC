@@ -7,6 +7,7 @@
 //! Modrinth-sourced mods with valid hashes go into the `files` array in the index.
 //! CurseForge mods (or mods without computable hashes) are placed in `overrides/mods/`.
 
+use crate::error::AppError;
 use crate::db;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -143,7 +144,7 @@ fn build_mrpack_zip(
     include_configs: bool,
     include_resourcepacks: bool,
     include_saves: bool,
-) -> Result<MrpackExportResult, String> {
+) -> Result<MrpackExportResult, AppError> {
     let instance_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance.id);
@@ -234,8 +235,8 @@ fn build_mrpack_zip(
     let json = serde_json::to_string_pretty(&index)
         .map_err(|e| format!("JSON serialisation error: {e}"))?;
     zip.start_file("modrinth.index.json", opts)
-        .map_err(|e| e.to_string())?;
-    zip.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    zip.write_all(json.as_bytes())?;
     total_size += json.len() as u64;
     file_count += 1;
 
@@ -243,12 +244,12 @@ fn build_mrpack_zip(
     for (fname, path) in &override_mods {
         let mut f =
             std::fs::File::open(path).map_err(|e| format!("Failed to read mod {fname}: {e}"))?;
-        let meta = f.metadata().map_err(|e| e.to_string())?;
+        let meta = f.metadata()?;
         let mut buf = Vec::new();
-        f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        f.read_to_end(&mut buf)?;
         zip.start_file(format!("overrides/mods/{fname}"), opts)
-            .map_err(|e| e.to_string())?;
-        zip.write_all(&buf).map_err(|e| e.to_string())?;
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        zip.write_all(&buf)?;
         total_size += meta.len();
         file_count += 1;
     }
@@ -278,7 +279,7 @@ fn build_mrpack_zip(
         }
     }
 
-    zip.finish().map_err(|e| e.to_string())?;
+    zip.finish().map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Use actual file size for accuracy.
     let final_size = std::fs::metadata(dest_path)
@@ -308,13 +309,13 @@ pub async fn export_mrpack(
     include_configs: bool,
     include_resourcepacks: bool,
     include_saves: bool,
-) -> Result<MrpackExportResult, String> {
+) -> Result<MrpackExportResult, AppError> {
     let (instance, mods) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let instance = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id)?;
         (instance, mods)
     };
 
@@ -354,13 +355,13 @@ pub async fn export_mrpack_to_path(
     include_configs: bool,
     include_resourcepacks: bool,
     include_saves: bool,
-) -> Result<MrpackExportResult, String> {
+) -> Result<MrpackExportResult, AppError> {
     let (instance, mods) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let instance = db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id)?;
         (instance, mods)
     };
 

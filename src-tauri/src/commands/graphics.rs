@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::paths::data_dir;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -49,27 +50,28 @@ fn settings_path(instance_id: &str) -> std::path::PathBuf {
 }
 
 #[tauri::command]
-pub fn get_graphics_settings(instance_id: String) -> Result<GraphicsSettings, String> {
+pub fn get_graphics_settings(instance_id: String) -> Result<GraphicsSettings, AppError> {
     let path = settings_path(&instance_id);
     if !path.exists() {
         return Ok(GraphicsSettings::default());
     }
-    let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&data).map_err(|e| e.to_string())
+    let data = fs::read_to_string(&path)?;
+    Ok(serde_json::from_str(&data)?)
 }
 
 #[tauri::command]
 pub fn update_graphics_settings(
     instance_id: String,
     settings: GraphicsSettings,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let path = settings_path(&instance_id);
-    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| e.to_string())
+    let json = serde_json::to_string_pretty(&settings)?;
+    fs::write(&path, json)?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn apply_graphics_settings(instance_id: String) -> Result<(), String> {
+pub fn apply_graphics_settings(instance_id: String) -> Result<(), AppError> {
     let settings = get_graphics_settings(instance_id.clone())?;
     let options_path = data_dir()
         .join("instances")
@@ -79,7 +81,7 @@ pub fn apply_graphics_settings(instance_id: String) -> Result<(), String> {
 
     // Read existing options.txt or create empty
     let mut options: std::collections::HashMap<String, String> = if options_path.exists() {
-        let data = fs::read_to_string(&options_path).map_err(|e| e.to_string())?;
+        let data = fs::read_to_string(&options_path)?;
         data.lines()
             .filter_map(|line| {
                 let (k, v) = line.split_once(':')?;
@@ -132,6 +134,9 @@ pub fn apply_graphics_settings(instance_id: String) -> Result<(), String> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    fs::create_dir_all(options_path.parent().unwrap()).ok();
-    fs::write(&options_path, content).map_err(|e| e.to_string())
+    if let Some(parent) = options_path.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    fs::write(&options_path, content)?;
+    Ok(())
 }

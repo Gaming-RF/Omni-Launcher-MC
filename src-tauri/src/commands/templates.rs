@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::commands::instances::InstanceListItem;
 use crate::db;
 use crate::AppState;
@@ -168,13 +169,13 @@ fn builtin_templates() -> Vec<TemplateInfo> {
 
 // ── DB helpers for custom_templates ──────────────────────────────
 
-fn get_custom_templates_db(db: &rusqlite::Connection) -> Result<Vec<TemplateInfo>, String> {
+fn get_custom_templates_db(db: &rusqlite::Connection) -> Result<Vec<TemplateInfo>, AppError> {
     let mut stmt = db
         .prepare(
             "SELECT id, name, description, game_version, loader, loader_version, mods_json, icon \
              FROM custom_templates ORDER BY created_at DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -199,18 +200,17 @@ fn get_custom_templates_db(db: &rusqlite::Connection) -> Result<Vec<TemplateInfo
                     .unwrap_or_else(|| "📦".into()),
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    rows.collect::<std::result::Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
+    Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
 }
 
 // ── Commands ─────────────────────────────────────────────────────
 
 /// Returns all templates (builtin + custom).
 #[tauri::command]
-pub fn list_templates(state: State<'_, AppState>) -> Result<Vec<TemplateInfo>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn list_templates(state: State<'_, AppState>) -> Result<Vec<TemplateInfo>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut templates = builtin_templates();
     let custom = get_custom_templates_db(&db)?;
     templates.extend(custom);
@@ -219,8 +219,8 @@ pub fn list_templates(state: State<'_, AppState>) -> Result<Vec<TemplateInfo>, S
 
 /// Returns only custom templates from the database.
 #[tauri::command]
-pub fn list_custom_templates(state: State<'_, AppState>) -> Result<Vec<TemplateInfo>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+pub fn list_custom_templates(state: State<'_, AppState>) -> Result<Vec<TemplateInfo>, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     get_custom_templates_db(&db)
 }
 
@@ -231,7 +231,7 @@ pub fn create_instance_from_template(
     template_id: String,
     name: String,
     game_version: Option<String>,
-) -> Result<InstanceListItem, String> {
+) -> Result<InstanceListItem, AppError> {
     // Find the template (builtin first, then custom DB)
     let template = builtin_templates()
         .into_iter()
@@ -255,7 +255,7 @@ pub fn create_instance_from_template(
         }
     });
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let instance = db::instances::create_instance(
         &db,
         db::instances::CreateInstanceParams {
@@ -269,7 +269,7 @@ pub fn create_instance_from_template(
             allocated_memory_mb: 4096,
         },
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(InstanceListItem {
         id: instance.id,
@@ -292,17 +292,17 @@ pub fn save_as_template(
     instance_id: String,
     template_name: String,
     description: String,
-) -> Result<TemplateInfo, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<TemplateInfo, AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Fetch the source instance
     let instance = db::instances::get_instance(&db, &instance_id)
-        .map_err(|e| e.to_string())?
+        ?
         .ok_or("Instance not found")?;
 
     // Fetch installed mods for the instance and turn them into TemplateMod stubs
     let mods = db::mods::get_instance_mods(&db, &instance_id)
-        .map_err(|e| e.to_string())?
+        ?
         .into_iter()
         .map(|m| TemplateMod {
             name: m.name.clone(),
@@ -333,7 +333,7 @@ pub fn save_as_template(
             now,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(TemplateInfo {
         id,
@@ -354,17 +354,17 @@ pub fn save_as_template(
 pub fn delete_custom_template(
     state: State<'_, AppState>,
     template_id: String,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+) -> Result<(), AppError> {
+    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let rows = db
         .execute(
             "DELETE FROM custom_templates WHERE id = ?1",
             rusqlite::params![template_id],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     if rows == 0 {
-        return Err("Template not found".into());
+        return Err(AppError::NotFound("Template not found".into()));
     }
     Ok(())
 }

@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Debug)]
@@ -18,11 +19,11 @@ pub struct ModloaderMatrixEntry {
 #[tauri::command]
 pub async fn get_modloader_matrix(
     game_version: String,
-) -> Result<Vec<ModloaderMatrixEntry>, String> {
+) -> Result<Vec<ModloaderMatrixEntry>, AppError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let (fabric, forge, quilt, neoforge) = tokio::join!(
         fetch_fabric(&client, &game_version),
@@ -67,11 +68,11 @@ pub async fn get_modloader_matrix(
 pub async fn get_instance_modloader_matrix(
     state: tauri::State<'_, crate::AppState>,
     instance_id: String,
-) -> Result<Vec<ModloaderMatrixEntry>, String> {
+) -> Result<Vec<ModloaderMatrixEntry>, AppError> {
     let (game_version, installed_loader, installed_loader_version) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
         let instance = crate::db::instances::get_instance(&db, &instance_id)
-            .map_err(|e| e.to_string())?
+            ?
             .ok_or("Instance not found")?;
         (
             instance.game_version,
@@ -95,7 +96,7 @@ pub async fn get_instance_modloader_matrix(
 async fn fetch_fabric(
     client: &reqwest::Client,
     game_version: &str,
-) -> Result<ModloaderMatrixEntry, String> {
+) -> Result<ModloaderMatrixEntry, AppError> {
     let url = format!(
         "https://meta.fabricmc.net/v2/versions/loader/{}",
         game_version
@@ -104,10 +105,10 @@ async fn fetch_fabric(
         .get(&url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        ?
         .json()
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let versions: Vec<LoaderVersionInfo> = resp
         .iter()
@@ -141,17 +142,17 @@ async fn fetch_fabric(
 async fn fetch_forge(
     client: &reqwest::Client,
     game_version: &str,
-) -> Result<ModloaderMatrixEntry, String> {
+) -> Result<ModloaderMatrixEntry, AppError> {
     // Forge versions from maven metadata
     let url = "https://files.minecraftforge.net/maven/net/minecraftforge/forge/maven-metadata.xml";
     let body = client
         .get(url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        ?
         .text()
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Parse versions that match our game version
     let prefix = format!("{}-", game_version);
@@ -188,7 +189,7 @@ async fn fetch_forge(
 async fn fetch_quilt(
     client: &reqwest::Client,
     game_version: &str,
-) -> Result<ModloaderMatrixEntry, String> {
+) -> Result<ModloaderMatrixEntry, AppError> {
     let url = format!(
         "https://meta.quiltmc.org/v3/versions/loader/{}",
         game_version
@@ -197,10 +198,10 @@ async fn fetch_quilt(
         .get(&url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        ?
         .json()
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let versions: Vec<LoaderVersionInfo> = resp
         .iter()
@@ -233,16 +234,16 @@ async fn fetch_quilt(
 async fn fetch_neoforge(
     client: &reqwest::Client,
     game_version: &str,
-) -> Result<ModloaderMatrixEntry, String> {
+) -> Result<ModloaderMatrixEntry, AppError> {
     let url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
     let body = client
         .get(url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        ?
         .text()
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // NeoForge versions are like 21.0.1-beta for MC 1.21
     let mc_major = game_version.split('.').nth(1).unwrap_or("21");

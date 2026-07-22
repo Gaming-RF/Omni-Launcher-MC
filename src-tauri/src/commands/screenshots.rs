@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::paths::data_dir;
 use serde::Serialize;
 use std::fs;
@@ -22,7 +23,7 @@ fn parse_date_from_filename(name: &str) -> String {
 }
 
 #[tauri::command]
-pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, String> {
+pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -31,14 +32,14 @@ pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, Stri
         return Ok(Vec::new());
     }
     let mut screenshots = Vec::new();
-    for entry in fs::read_dir(&dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(&dir)? {
+        let entry = entry?;
         let name = entry.file_name().to_string_lossy().to_string();
         let lower = name.to_lowercase();
         if !lower.ends_with(".png") && !lower.ends_with(".jpg") && !lower.ends_with(".jpeg") {
             continue;
         }
-        let meta = entry.metadata().map_err(|e| e.to_string())?;
+        let meta = entry.metadata()?;
         let path = entry.path().to_string_lossy().to_string();
         screenshots.push(ScreenshotInfo {
             created_at: parse_date_from_filename(&name),
@@ -52,26 +53,28 @@ pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, Stri
 }
 
 #[tauri::command]
-pub fn delete_screenshot(instance_id: String, filename: String) -> Result<(), String> {
+pub fn delete_screenshot(instance_id: String, filename: String) -> Result<(), AppError> {
     let path = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("screenshots")
         .join(&filename);
     if !path.exists() {
-        return Err(format!("Screenshot not found: {}", filename));
+        return Err(AppError::Internal(format!("{}", "")));
     }
-    fs::remove_file(&path).map_err(|e| e.to_string())
+    fs::remove_file(&path).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn open_screenshots_folder(instance_id: String) -> Result<(), String> {
+pub fn open_screenshots_folder(instance_id: String) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("screenshots");
     fs::create_dir_all(&dir).ok();
-    opener::open(&dir).map_err(|e| e.to_string())
+    opener::open(&dir).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -79,15 +82,15 @@ pub fn export_screenshot(
     instance_id: String,
     filename: String,
     dest_path: String,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let src = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("screenshots")
         .join(&filename);
     if !src.exists() {
-        return Err(format!("Screenshot not found: {}", filename));
+        return Err(AppError::Internal(format!("{}", "")));
     }
-    fs::copy(&src, &dest_path).map_err(|e| e.to_string())?;
+    fs::copy(&src, &dest_path)?;
     Ok(())
 }

@@ -47,16 +47,11 @@ desktop.ini
 # Tauri signing keys (generated locally, must stay private)
 src-tauri/*.key
 src-tauri/*.key.pub
+latest.json.sig
 
 # Rust
 **/*.rs.bk
-Cargo.lock
 
 # Coverage
 coverage/
 *.lcov
-
-# Tauri signing keys
-*.key
-*.key.pub
-latest.json.sig

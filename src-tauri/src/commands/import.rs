@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::db;
 use crate::AppState;
 use serde::Serialize;
@@ -33,7 +34,7 @@ pub struct ImportableInstance {
 pub async fn scan_launcher_instances(
     launcher_type: LauncherType,
     base_path: Option<String>,
-) -> Result<Vec<ImportableInstance>, String> {
+) -> Result<Vec<ImportableInstance>, AppError> {
     let path = match base_path {
         Some(p) => PathBuf::from(p),
         None => detect_launcher_path(&launcher_type),
@@ -62,10 +63,10 @@ pub async fn import_launcher_instance(
     game_version: String,
     loader: String,
     loader_version: Option<String>,
-) -> Result<db::instances::GameInstance, String> {
+) -> Result<db::instances::GameInstance, AppError> {
     let source = PathBuf::from(&source_path);
     if !source.exists() {
-        return Err(format!("Source path does not exist: {}", source_path));
+        return Err(AppError::Internal(format!("{}", "")));
     }
 
     // Create the instance in our DB
@@ -97,8 +98,8 @@ pub async fn import_launcher_instance(
     };
 
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
-        db::instances::insert_instance(&db, &instance).map_err(|e| e.to_string())?;
+        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        db::instances::insert_instance(&db, &instance)?;
     }
 
     // Copy mods/saves/resourcepacks from source to our instance
@@ -107,7 +108,7 @@ pub async fn import_launcher_instance(
         .join(&instance_id);
     tokio::fs::create_dir_all(&instance_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Copy common directories
     let dirs_to_copy = ["mods", "saves", "resourcepacks", "shaderpacks", "config"];
@@ -117,7 +118,7 @@ pub async fn import_launcher_instance(
             let dst_dir = instance_dir.join(dir_name);
             copy_dir_recursive(&src_dir, &dst_dir)
                 .await
-                .map_err(|e| e.to_string())?;
+                ?;
         }
     }
 
@@ -129,7 +130,7 @@ pub async fn import_launcher_instance(
             let dst_file = instance_dir.join(file_name);
             tokio::fs::copy(&src_file, &dst_file)
                 .await
-                .map_err(|e| e.to_string())?;
+                ?;
         }
     }
 
@@ -177,7 +178,7 @@ fn detect_launcher_path(launcher_type: &LauncherType) -> PathBuf {
 }
 
 /// Scan MultiMC / Prism Launcher instances.
-async fn scan_multimc(base: &std::path::Path) -> Result<Vec<ImportableInstance>, String> {
+async fn scan_multimc(base: &std::path::Path) -> Result<Vec<ImportableInstance>, AppError> {
     let instances_dir = base.join("instances");
     if !instances_dir.exists() {
         return Ok(vec![]);
@@ -186,9 +187,9 @@ async fn scan_multimc(base: &std::path::Path) -> Result<Vec<ImportableInstance>,
     let mut results = Vec::new();
     let mut entries = tokio::fs::read_dir(&instances_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let instance_cfg = entry.path().join("instance.cfg");
         if !instance_cfg.exists() {
             continue;
@@ -236,7 +237,7 @@ async fn scan_multimc(base: &std::path::Path) -> Result<Vec<ImportableInstance>,
 }
 
 /// Scan CurseForge App instances.
-async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableInstance>, String> {
+async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableInstance>, AppError> {
     let profiles_dir = base.join("minecraft").join("Instances");
     if !profiles_dir.exists() {
         return Ok(vec![]);
@@ -245,9 +246,9 @@ async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableIns
     let mut results = Vec::new();
     let mut entries = tokio::fs::read_dir(&profiles_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let manifest = entry.path().join("manifest.json");
         if !manifest.exists() {
             continue;
@@ -299,7 +300,7 @@ async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableIns
 }
 
 /// Scan ATLauncher instances.
-async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstance>, String> {
+async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstance>, AppError> {
     let instances_dir = base.join("instances");
     if !instances_dir.exists() {
         return Ok(vec![]);
@@ -308,9 +309,9 @@ async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
     let mut results = Vec::new();
     let mut entries = tokio::fs::read_dir(&instances_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let instance_json = entry.path().join("instance.json");
         if !instance_json.exists() {
             continue;
@@ -352,7 +353,7 @@ async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
 }
 
 /// Scan GDLauncher instances.
-async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstance>, String> {
+async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstance>, AppError> {
     let instances_dir = base.join("instances");
     if !instances_dir.exists() {
         return Ok(vec![]);
@@ -361,9 +362,9 @@ async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
     let mut results = Vec::new();
     let mut entries = tokio::fs::read_dir(&instances_dir)
         .await
-        .map_err(|e| e.to_string())?;
+        ?;
 
-    while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
+    while let Some(entry) = entries.next_entry().await? {
         let config = entry.path().join("config.json");
         if !config.exists() {
             continue;
@@ -406,7 +407,7 @@ async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
 }
 
 /// Scan vanilla Minecraft launcher instances (profiles).
-async fn scan_vanilla(base: &std::path::Path) -> Result<Vec<ImportableInstance>, String> {
+async fn scan_vanilla(base: &std::path::Path) -> Result<Vec<ImportableInstance>, AppError> {
     let launcher_profiles = base.join("launcher_profiles.json");
     if !launcher_profiles.exists() {
         return Ok(vec![]);

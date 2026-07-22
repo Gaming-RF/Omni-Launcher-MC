@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -18,7 +19,7 @@ pub async fn create_desktop_shortcut(
     instance_name: String,
     output_dir: Option<String>,
     server_address: Option<String>,
-) -> Result<ShortcutResult, String> {
+) -> Result<ShortcutResult, AppError> {
     let out_dir = output_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| dirs::desktop_dir().unwrap_or_else(|| PathBuf::from(".")));
@@ -61,7 +62,7 @@ Categories=Game;
 
         tokio::fs::write(&desktop_file, content)
             .await
-            .map_err(|e| e.to_string())?;
+            ?;
 
         // Make executable
         #[cfg(unix)]
@@ -69,12 +70,12 @@ Categories=Game;
             use std::os::unix::fs::PermissionsExt;
             let mut perms = tokio::fs::metadata(&desktop_file)
                 .await
-                .map_err(|e| e.to_string())?
+                ?
                 .permissions();
             perms.set_mode(0o755);
             tokio::fs::set_permissions(&desktop_file, perms)
                 .await
-                .map_err(|e| e.to_string())?;
+                ?;
         }
 
         return Ok(ShortcutResult {
@@ -99,7 +100,7 @@ Categories=Game;
 
         tokio::fs::write(&bat_file, content)
             .await
-            .map_err(|e| e.to_string())?;
+            ?;
 
         return Ok(ShortcutResult {
             path: bat_file.to_string_lossy().to_string(),
@@ -121,19 +122,19 @@ Categories=Game;
 
         tokio::fs::write(&app_dir, &content)
             .await
-            .map_err(|e| e.to_string())?;
+            ?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = tokio::fs::metadata(&app_dir)
                 .await
-                .map_err(|e| e.to_string())?
+                ?
                 .permissions();
             perms.set_mode(0o755);
             tokio::fs::set_permissions(&app_dir, perms)
                 .await
-                .map_err(|e| e.to_string())?;
+                ?;
         }
 
         return Ok(ShortcutResult {
@@ -146,7 +147,7 @@ Categories=Game;
 
 /// Get the default shortcut output directory (Desktop).
 #[tauri::command]
-pub fn get_shortcut_default_dir() -> Result<String, String> {
+pub fn get_shortcut_default_dir() -> Result<String, AppError> {
     Ok(dirs::desktop_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .to_string_lossy()

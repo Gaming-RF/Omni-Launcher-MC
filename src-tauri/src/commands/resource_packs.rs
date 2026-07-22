@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::utils::paths::data_dir;
 use serde::Serialize;
 use std::fs;
@@ -85,7 +86,7 @@ fn read_zip_description(path: &PathBuf) -> Result<Option<String>, Box<dyn std::e
     Ok(desc)
 }
 
-fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), String> {
+fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), AppError> {
     let old_path = dir.join(filename);
     if !old_path.exists() {
         // Try finding with/without underscore prefix
@@ -95,19 +96,18 @@ fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), S
             dir.join(format!("_{}", filename))
         };
         if alt.exists() {
+            let fname = alt
+                .file_name()
+                .ok_or_else(|| "Invalid file path".to_string())?;
             let target = if enabled {
-                dir.join(
-                    alt.file_name()
-                        .unwrap()
-                        .to_string_lossy()
-                        .trim_start_matches('_'),
-                )
+                dir.join(fname.to_string_lossy().trim_start_matches('_'))
             } else {
-                dir.join(format!("_{}", alt.file_name().unwrap().to_string_lossy()))
+                dir.join(format!("_{}", fname.to_string_lossy()))
             };
-            return fs::rename(&alt, &target).map_err(|e| e.to_string());
+            fs::rename(&alt, &target).map_err(|e| AppError::Internal(e.to_string()))?;
+            return Ok(());
         }
-        return Err(format!("File not found: {}", filename));
+        return Err(AppError::Internal(format!("File not found: {}", filename)));
     }
     let target = if enabled {
         let stripped = filename.trim_start_matches('_');
@@ -115,23 +115,25 @@ fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), S
     } else {
         dir.join(format!("_{}", filename))
     };
-    fs::rename(&old_path, &target).map_err(|e| e.to_string())
+    fs::rename(&old_path, &target).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
-fn delete_pack_impl(dir: PathBuf, filename: &str) -> Result<(), String> {
+fn delete_pack_impl(dir: PathBuf, filename: &str) -> Result<(), AppError> {
     let path = dir.join(filename);
     if !path.exists() {
-        return Err(format!("File not found: {}", filename));
+        return Err(AppError::Internal(format!("File not found: {}", filename)));
     }
     if path.is_dir() {
-        fs::remove_dir_all(&path).map_err(|e| e.to_string())
+        fs::remove_dir_all(&path).map_err(|e| AppError::Internal(e.to_string()))?;
     } else {
-        fs::remove_file(&path).map_err(|e| e.to_string())
+        fs::remove_file(&path).map_err(|e| AppError::Internal(e.to_string()))?;
     }
+    Ok(())
 }
 
 #[tauri::command]
-pub fn list_resource_packs(instance_id: String) -> Result<Vec<ResourcePackInfo>, String> {
+pub fn list_resource_packs(instance_id: String) -> Result<Vec<ResourcePackInfo>, AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -140,7 +142,7 @@ pub fn list_resource_packs(instance_id: String) -> Result<Vec<ResourcePackInfo>,
 }
 
 #[tauri::command]
-pub fn list_shaders(instance_id: String) -> Result<Vec<ResourcePackInfo>, String> {
+pub fn list_shaders(instance_id: String) -> Result<Vec<ResourcePackInfo>, AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -153,7 +155,7 @@ pub fn toggle_resource_pack(
     instance_id: String,
     filename: String,
     enabled: bool,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -162,7 +164,7 @@ pub fn toggle_resource_pack(
 }
 
 #[tauri::command]
-pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Result<(), String> {
+pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -171,7 +173,7 @@ pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Re
 }
 
 #[tauri::command]
-pub fn delete_resource_pack(instance_id: String, filename: String) -> Result<(), String> {
+pub fn delete_resource_pack(instance_id: String, filename: String) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -180,7 +182,7 @@ pub fn delete_resource_pack(instance_id: String, filename: String) -> Result<(),
 }
 
 #[tauri::command]
-pub fn delete_shader(instance_id: String, filename: String) -> Result<(), String> {
+pub fn delete_shader(instance_id: String, filename: String) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -189,21 +191,23 @@ pub fn delete_shader(instance_id: String, filename: String) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn open_resource_packs_folder(instance_id: String) -> Result<(), String> {
+pub fn open_resource_packs_folder(instance_id: String) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("resourcepacks");
     fs::create_dir_all(&dir).ok();
-    opener::open(&dir).map_err(|e| e.to_string())
+    opener::open(&dir).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn open_shaders_folder(instance_id: String) -> Result<(), String> {
+pub fn open_shaders_folder(instance_id: String) -> Result<(), AppError> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("shaderpacks");
     fs::create_dir_all(&dir).ok();
-    opener::open(&dir).map_err(|e| e.to_string())
+    opener::open(&dir).map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
 }
