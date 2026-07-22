@@ -118,7 +118,8 @@ mod tests {
 
     #[test]
     fn test_all_ids() {
-        let ids: Vec<&str> = Mirror::all().iter().map(|m| m.id()).collect();
+        let mirrors = Mirror::all();
+        let ids: Vec<&str> = mirrors.iter().map(|m| m.id()).collect();
         assert_eq!(ids, vec!["official", "bmclapi", "mcbbs"]);
     }
 }
