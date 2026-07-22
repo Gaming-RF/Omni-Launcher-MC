@@ -347,19 +347,28 @@ function UpdateChecker() {
 
       // Find a download asset for current platform
       const ua = navigator.userAgent.toLowerCase();
-      let platform = "x64";
-      if (ua.includes("mac")) platform = ua.includes("arm") ? "aarch64" : "x64";
-      if (ua.includes("linux")) platform = "amd64";
+      const isWindows = ua.includes("win");
+      const isMac = ua.includes("mac");
+      const isLinux = ua.includes("linux");
 
-      const msi = latest.assets?.find((a: { name: string }) =>
-        a.name.endsWith(".msi") && a.name.includes(platform)
-      );
-      const dmg = latest.assets?.find((a: { name: string }) =>
-        a.name.endsWith(".dmg") && (a.name.includes(platform) || a.name.includes("x64"))
-      );
-      const deb = latest.assets?.find((a: { name: string }) => a.name.endsWith(".deb"));
+      let asset: { browser_download_url: string; name: string } | undefined;
 
-      setDownloadUrl(msi?.browser_download_url || dmg?.browser_download_url || deb?.browser_download_url || latest.html_url);
+      if (isWindows) {
+        // Prefer .exe (NSIS installer), then .msi
+        asset = latest.assets?.find((a: { name: string }) => a.name.endsWith(".exe"))
+          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".msi"));
+      } else if (isMac) {
+        const arch = ua.includes("arm") ? "aarch64" : "x64";
+        asset = latest.assets?.find((a: { name: string }) =>
+          a.name.endsWith(".dmg") && a.name.includes(arch)
+        );
+      } else if (isLinux) {
+        asset = latest.assets?.find((a: { name: string }) => a.name.endsWith(".deb"))
+          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".rpm"))
+          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".AppImage"));
+      }
+
+      setDownloadUrl(asset?.browser_download_url || latest.html_url);
 
       // Compare versions (simple string compare for semver)
       if (tag !== currentVersion) {
