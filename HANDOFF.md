@@ -180,7 +180,17 @@ If adding new external domains, update the `csp` field in `tauri.conf.json`.
 
 ---
 
-## 8. Known Issues / Gotchas
+## 8. Versioning Convention
+
+| Change type | Version bump | Example |
+|-------------|-------------|---------|
+| Bug fix | patch (0.0.1) | 0.2.2 → 0.2.3 |
+| Minor/feature update | minor (0.1.0) | 0.2.3 → 0.3.0 |
+| Big/major update | major (1.0.0) | 0.3.0 → 1.0.0 |
+
+Always update version in both `package.json` and `src-tauri/tauri.conf.json`.
+
+## 9. Known Issues / Gotchas
 
 1. **`latest.json` is stale** — still at v0.2.1, only has `linux-x86_64` platform
 2. **v0.2.2 release is a draft** — needs manual publish on GitHub
