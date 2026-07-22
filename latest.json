@@ -1,11 +1,23 @@
 {
-  "version": "0.2.1",
-  "notes": "Auth fixes, modpack resilience, CurseForge image fix, auto-updater",
-  "pub_date": "2026-07-22T08:45:00Z",
+  "version": "0.2.2",
+  "notes": "Tauri native auto-updater with signed updates, auth fixes, modpack resilience, CurseForge image fix",
+  "pub_date": "2026-07-22T10:15:00Z",
   "platforms": {
     "linux-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRelNFSWlNZXhsTXBGMzFuUjJQb292NTNQclNlc2I2ZkJKaUpSc0t3MXZIOHFsS1BGRVU0dDJOSnpic3F5dEl4VzB6NjFLdzlqb1V3c1pVQVAyVklpUVVNRWhFL28zT1E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzA5OTE3CWZpbGU6T21uaUxhdW5jaGVyTUNfMC4yLjFfYW1kNjQuZGViCmpSWmxWWmFuWlRjNEx3dUQ2WGhLVFh0VlJSeksxZXJpRGNwTFRqN3QxQkpaUXhxb1RKMGMycmlxVmhVM0VjNm0wcE5lY1ppc2NYeStKeFdhUlM2WUR3PT0K",
-      "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.1/OmniLauncherMC_0.2.1_amd64.deb"
+      "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_0.2.2_amd64.deb"
+    },
+    "windows-x86_64": {
+      "signature": "",
+      "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_0.2.2_x64_en-US.msi"
+    },
+    "darwin-x86_64": {
+      "signature": "",
+      "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "",
+      "url": "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/download/v0.2.2/OmniLauncherMC_aarch64.app.tar.gz"
     }
   }
 }
