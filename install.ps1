@@ -1,180 +1,277 @@
 # OmniLauncherMC Windows Installer
 # Builds from source — always latest
-# Run: irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1 | iex
+# Run in PowerShell (Admin recommended):
+#   irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1 | iex
+# Or download and run:
+#   Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1" -OutFile "$env:TEMP\olmc-install.ps1"; & "$env:TEMP\olmc-install.ps1"
+
+[CmdletBinding()]
+param()
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
 $REPO = "https://github.com/Gaming-RF/Omni-Launcher-MC.git"
 $INSTALL_DIR = "$env:LOCALAPPDATA\OmniLauncherMC"
 $BIN_DIR = "$env:LOCALAPPDATA\OmniLauncherMC\bin"
 
-function Write-Info { param($msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan }
-function Write-Ok   { param($msg) Write-Host "[OK]   $msg" -ForegroundColor Green }
-function Write-Warn { param($msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow }
-function Write-Fail { param($msg) Write-Host "[FAIL] $msg" -ForegroundColor Red; exit 1 }
+function Write-Info  { param([string]$msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan }
+function Write-Ok    { param([string]$msg) Write-Host "[OK]   $msg" -ForegroundColor Green }
+function Write-Warn  { param([string]$msg) Write-Host "[WARN] $msg" -ForegroundColor Yellow }
+function Write-Step  { param([string]$msg) Write-Host "`n>> $msg" -ForegroundColor White }
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  OmniLauncherMC — Windows Installer    " -ForegroundColor Cyan
-Write-Host "  Builds from source, always latest      " -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# ── Check admin for deps install ────────────────────────────────────
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-# ── Install Chocolatey (if needed) ──────────────────────────────────
-if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-    Write-Info "Installing Chocolatey package manager..."
-    Set-ExecutionPolicy Bypass -Scope Process -Force
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-    Write-Ok "Chocolatey installed"
-} else {
-    Write-Ok "Chocolatey already installed"
+function Refresh-Path {
+    $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machinePath;$userPath"
 }
 
-# ── Install Git ─────────────────────────────────────────────────────
+function Test-Admin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Install-IfMissing {
+    param([string]$name, [string]$command, [scriptblock]$installAction)
+    if (Get-Command $command -ErrorAction SilentlyContinue) {
+        Write-Ok "$name already installed"
+        return $true
+    }
+    Write-Info "Installing $name..."
+    try {
+        & $installAction
+        Refresh-Path
+        if (Get-Command $command -ErrorAction SilentlyContinue) {
+            Write-Ok "$name installed"
+            return $true
+        } else {
+            Write-Warn "$name installed but not found in PATH yet (may need terminal restart)"
+            return $false
+        }
+    } catch {
+        Write-Warn "Failed to install $name : $_"
+        return $false
+    }
+}
+
+# ── Header ──────────────────────────────────────────────────────────
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "  OmniLauncherMC — Windows Installer      " -ForegroundColor Cyan
+Write-Host "  Builds from source, always latest        " -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host ""
+
+$isAdmin = Test-Admin
+if (-not $isAdmin) {
+    Write-Warn "Not running as Administrator. Some installs may require elevation."
+    Write-Warn "If this fails, right-click PowerShell -> Run as Administrator."
+    Write-Host ""
+}
+
+# ── Step 1: Chocolatey ──────────────────────────────────────────────
+Write-Step "Checking package manager..."
+if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+    Write-Info "Installing Chocolatey..."
+    try {
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Refresh-Path
+        Write-Ok "Chocolatey installed"
+    } catch {
+        Write-Fail "Chocolatey install failed. Install manually: https://chocolatey.org/install"
+    }
+} else {
+    Write-Ok "Chocolatey $(choco --version)"
+}
+
+# ── Step 2: Git ─────────────────────────────────────────────────────
+Write-Step "Checking Git..."
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Info "Installing Git..."
-    choco install git -y --no-progress
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+    choco install git -y --no-progress --params "'/NoShellIntegration'"
+    Refresh-Path
     Write-Ok "Git installed"
 } else {
-    Write-Ok "Git already installed ($(git --version))"
+    Write-Ok "Git $(git --version)"
 }
 
-# ── Install Rust ────────────────────────────────────────────────────
-if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
-    Write-Info "Installing Rust..."
-    Invoke-RestMethod -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
-    & "$env:TEMP\rustup-init.exe" -y --default-toolchain stable
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-    $env:CARGO_HOME = "$env:USERPROFILE\.cargo"
-    $env:Path += ";$env:CARGO_HOME\bin"
-    Write-Ok "Rust installed"
-} else {
-    Write-Ok "Rust already installed ($(rustc --version))"
-}
-
-# ── Install Node.js ─────────────────────────────────────────────────
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Info "Installing Node.js 22..."
-    choco install nodejs-lts -y --no-progress
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-    Write-Ok "Node.js installed"
-} else {
-    Write-Ok "Node.js already installed ($(node --version))"
-}
-
-# ── Install pnpm ────────────────────────────────────────────────────
-if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    Write-Info "Installing pnpm..."
-    npm install -g pnpm
-    Write-Ok "pnpm installed"
-} else {
-    Write-Ok "pnpm already installed ($(pnpm --version))"
-}
-
-# ── Install Visual Studio Build Tools ───────────────────────────────
-$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+# ── Step 3: Visual Studio Build Tools ───────────────────────────────
+Write-Step "Checking Visual Studio Build Tools..."
 $hasBuildTools = $false
+$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (Test-Path $vsWhere) {
     $installPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
     if ($installPath) { $hasBuildTools = $true }
 }
 
 if (-not $hasBuildTools) {
-    Write-Info "Installing Visual Studio Build Tools (required for Rust on Windows)..."
-    Write-Warn "This will take several minutes and may show a UAC prompt."
-    choco install visualstudio2022buildtools -y --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --wait"
-    Write-Ok "VS Build Tools installed"
-} else {
-    Write-Ok "VS Build Tools already present"
+    # Check if C++ compiler is available at all
+    if (Get-Command cl.exe -ErrorAction SilentlyContinue) {
+        $hasBuildTools = $true
+        Write-Ok "C++ compiler found in PATH"
+    }
 }
 
-# ── Clone or update repo ────────────────────────────────────────────
+if (-not $hasBuildTools) {
+    Write-Info "Installing Visual Studio 2022 Build Tools (required for Rust on Windows)..."
+    Write-Warn "This is a large download (~2-6 GB) and takes 5-15 minutes."
+    try {
+        choco install visualstudio2022buildtools -y --no-progress --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --wait"
+        Refresh-Path
+        Write-Ok "VS Build Tools installed"
+    } catch {
+        Write-Warn "VS Build Tools install may have failed. If Rust build fails, install manually:"
+        Write-Warn "  https://visualstudio.microsoft.com/visual-cpp-build-tools/"
+    }
+} else {
+    Write-Ok "VS Build Tools present"
+}
+
+# ── Step 4: Rust ────────────────────────────────────────────────────
+Write-Step "Checking Rust..."
+if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
+    Write-Info "Installing Rust..."
+    $rustupInit = "$env:TEMP\rustup-init.exe"
+    Invoke-RestMethod -Uri "https://win.rustup.rs/x86_64" -OutFile $rustupInit
+    Start-Process -FilePath $rustupInit -ArgumentList "-y","--default-toolchain","stable" -Wait -NoNewWindow
+    Refresh-Path
+    # Also add cargo to current session
+    $cargoBin = "$env:USERPROFILE\.cargo\bin"
+    if (Test-Path $cargoBin) { $env:Path = "$env:Path;$cargoBin" }
+    if (Get-Command rustc -ErrorAction SilentlyContinue) {
+        Write-Ok "Rust $(rustc --version)"
+    } else {
+        Write-Fail "Rust install failed. Install manually: https://rustup.rs/"
+    }
+} else {
+    Write-Ok "Rust $(rustc --version)"
+}
+
+# ── Step 5: Node.js ─────────────────────────────────────────────────
+Write-Step "Checking Node.js..."
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    choco install nodejs-lts -y --no-progress
+    Refresh-Path
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        Write-Ok "Node.js $(node --version)"
+    } else {
+        Write-Fail "Node.js install failed. Install manually: https://nodejs.org/"
+    }
+} else {
+    Write-Ok "Node.js $(node --version)"
+}
+
+# ── Step 6: pnpm ────────────────────────────────────────────────────
+Write-Step "Checking pnpm..."
+if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+    # Try corepack first (ships with Node.js)
+    try {
+        corepack enable
+        corepack prepare pnpm@latest --activate
+        Refresh-Path
+    } catch {
+        # Fallback to npm global
+        npm install -g pnpm
+    }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        Write-Fail "pnpm install failed. Run: npm install -g pnpm"
+    }
+    Write-Ok "pnpm $(pnpm --version)"
+} else {
+    Write-Ok "pnpm $(pnpm --version)"
+}
+
+# ── Step 7: Clone or update repo ────────────────────────────────────
+Write-Step "Getting source code..."
 if (Test-Path "$INSTALL_DIR\.git") {
     Write-Info "Updating existing clone..."
-    Set-Location $INSTALL_DIR
-    git fetch --all --tags
+    Push-Location $INSTALL_DIR
+    git fetch --all --tags 2>$null
     git reset --hard origin/main
+    Pop-Location
 } else {
     Write-Info "Cloning repository..."
     if (Test-Path $INSTALL_DIR) { Remove-Item -Recurse -Force $INSTALL_DIR }
     git clone --depth 1 $REPO $INSTALL_DIR
-    Set-Location $INSTALL_DIR
 }
-$commit = git rev-parse --short HEAD
+$commit = (git -C $INSTALL_DIR rev-parse --short HEAD)
 Write-Ok "Source ready ($commit)"
 
-# ── Build ───────────────────────────────────────────────────────────
-Set-Location $INSTALL_DIR
-
-Write-Info "Installing frontend dependencies..."
-try { pnpm install --frozen-lockfile } catch { pnpm install }
-Write-Ok "Frontend deps installed"
-
-Write-Info "Building frontend..."
+# ── Step 8: Build frontend ──────────────────────────────────────────
+Write-Step "Building frontend..."
+Push-Location $INSTALL_DIR
+try { pnpm install --frozen-lockfile 2>$null } catch { pnpm install }
+Write-Ok "Dependencies installed"
 pnpm build
 Write-Ok "Frontend built"
+Pop-Location
 
-Write-Info "Building Tauri backend (release)... this may take a few minutes"
-Set-Location "$INSTALL_DIR\src-tauri"
+# ── Step 9: Build Rust backend ──────────────────────────────────────
+Write-Step "Building Tauri backend (release)... this takes 3-10 minutes"
+Push-Location "$INSTALL_DIR\src-tauri"
 cargo build --release
+Pop-Location
 Write-Ok "Backend built"
 
 $binary = "$INSTALL_DIR\src-tauri\target\release\omni-launcher-mc.exe"
 if (-not (Test-Path $binary)) {
     Write-Fail "Binary not found at $binary"
 }
-$size = [math]::Round((Get-Item $binary).Length / 1MB, 1)
-Write-Ok "Binary: $binary (${size} MB)"
+$sizeMB = [math]::Round((Get-Item $binary).Length / 1MB, 1)
+Write-Ok "Binary: ${sizeMB} MB"
 
-# ── Create launcher script ──────────────────────────────────────────
+# ── Step 10: Create shortcuts ───────────────────────────────────────
+Write-Step "Setting up shortcuts..."
+
+# Batch launcher in BIN_DIR
 New-Item -ItemType Directory -Force -Path $BIN_DIR | Out-Null
+Set-Content -Path "$BIN_DIR\omni-launcher-mc.bat" -Value "@echo off`n`"$binary`" %*"
 
-$launcher = @"
-@echo off
-"$binary" %*
-"@
-Set-Content -Path "$BIN_DIR\omni-launcher-mc.bat" -Value $launcher
-
-# Add to user PATH
+# Add BIN_DIR to user PATH
 $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
 if ($userPath -notlike "*$BIN_DIR*") {
     [System.Environment]::SetEnvironmentVariable("Path", "$userPath;$BIN_DIR", "User")
-    $env:Path += ";$BIN_DIR"
-    Write-Ok "Added $BIN_DIR to user PATH"
+    $env:Path = "$env:Path;$BIN_DIR"
+    Write-Ok "Added to PATH (restart terminal to pick up)"
 }
 
-# ── Create desktop shortcut ─────────────────────────────────────────
-$desktopPath = [System.Environment]::GetFolderPath("Desktop")
-$shortcutPath = "$desktopPath\OmniLauncherMC.lnk"
-$shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $binary
-$shortcut.WorkingDirectory = "$INSTALL_DIR\src-tauri\target\release"
-$shortcut.Description = "OmniLauncherMC - Minecraft Launcher"
-$shortcut.Save()
-Write-Ok "Desktop shortcut created"
+# Desktop shortcut
+try {
+    $desktopPath = [System.Environment]::GetFolderPath("Desktop")
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut("$desktopPath\OmniLauncherMC.lnk")
+    $shortcut.TargetPath = $binary
+    $shortcut.WorkingDirectory = "$INSTALL_DIR\src-tauri\target\release"
+    $shortcut.Description = "OmniLauncherMC - Minecraft Launcher"
+    $shortcut.Save()
+    Write-Ok "Desktop shortcut"
+} catch {
+    Write-Warn "Could not create desktop shortcut: $_"
+}
 
-# ── Create start menu entry ─────────────────────────────────────────
-$startMenu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\OmniLauncherMC"
-New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
-$menuShortcut = "$startMenu\OmniLauncherMC.lnk"
-$shortcut2 = $shell.CreateShortcut($menuShortcut)
-$shortcut2.TargetPath = $binary
-$shortcut2.WorkingDirectory = "$INSTALL_DIR\src-tauri\target\release"
-$shortcut2.Description = "OmniLauncherMC - Minecraft Launcher"
-$shortcut2.Save()
-Write-Ok "Start menu entry created"
+# Start Menu
+try {
+    $startMenu = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\OmniLauncherMC"
+    New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
+    $menuLnk = $shell.CreateShortcut("$startMenu\OmniLauncherMC.lnk")
+    $menuLnk.TargetPath = $binary
+    $menuLnk.WorkingDirectory = "$INSTALL_DIR\src-tauri\target\release"
+    $menuLnk.Save()
+    Write-Ok "Start Menu entry"
+} catch {
+    Write-Warn "Could not create Start Menu entry: $_"
+}
 
-# ── Create update script ────────────────────────────────────────────
+# ── Step 11: Update script ──────────────────────────────────────────
 $updateScript = @'
-Set-Location "$env:LOCALAPPDATA\OmniLauncherMC"
-git fetch --all --tags
+param()
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+$dir = "$env:LOCALAPPDATA\OmniLauncherMC"
+if (-not (Test-Path "$dir\.git")) { Write-Host "Not installed. Run installer first." -ForegroundColor Red; exit 1 }
+Set-Location $dir
+git fetch --all --tags 2>$null
 $local = git rev-parse HEAD
 $remote = git rev-parse origin/main
 if ($local -eq $remote) {
@@ -182,27 +279,27 @@ if ($local -eq $remote) {
     exit 0
 }
 git reset --hard origin/main
-Write-Host "[INFO] Rebuilding..." -ForegroundColor Cyan
-pnpm install --frozen-lockfile 2>$null; if ($LASTEXITCODE -ne 0) { pnpm install }
+Write-Host "[INFO] Rebuilding from $(git rev-parse --short HEAD)..." -ForegroundColor Cyan
+try { pnpm install --frozen-lockfile 2>$null } catch { pnpm install }
 pnpm build
 Set-Location src-tauri; cargo build --release
-Write-Host "[OK] Updated!" -ForegroundColor Green
+Write-Host "[OK] Updated! Run: omni-launcher-mc" -ForegroundColor Green
 '@
 Set-Content -Path "$BIN_DIR\omni-launcher-mc-update.ps1" -Value $updateScript
-$updateBat = @"
-@echo off
-powershell -ExecutionPolicy Bypass -File "$BIN_DIR\omni-launcher-mc-update.ps1"
-"@
-Set-Content -Path "$BIN_DIR\omni-launcher-mc-update.bat" -Value $updateBat
+Set-Content -Path "$BIN_DIR\omni-launcher-mc-update.bat" -Value "@echo off`npowershell -ExecutionPolicy Bypass -File `"$BIN_DIR\omni-launcher-mc-update.ps1`""
 Write-Ok "Update command: omni-launcher-mc-update"
 
 # ── Done ────────────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "       Installation Complete!            " -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "        Installation Complete!             " -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Run:           omni-launcher-mc (or use desktop shortcut)"
-Write-Host "  Update later:  omni-launcher-mc-update"
-Write-Host "  Source:        $INSTALL_DIR"
+Write-Host "  Run:           omni-launcher-mc" -ForegroundColor White
+Write-Host "                 (or use the desktop shortcut)" -ForegroundColor Gray
+Write-Host "  Update later:  omni-launcher-mc-update" -ForegroundColor White
+Write-Host "  Source:        $INSTALL_DIR" -ForegroundColor White
+Write-Host ""
+Write-Host "  NOTE: If 'omni-launcher-mc' is not found, restart your terminal" -ForegroundColor Yellow
+Write-Host "        to pick up the PATH change." -ForegroundColor Yellow
 Write-Host ""
