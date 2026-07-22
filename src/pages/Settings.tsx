@@ -320,63 +320,41 @@ export function Settings() {
 
 function UpdateChecker() {
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "available" | "none" | "error"
+    "idle" | "checking" | "available" | "none" | "error" | "installing"
   >("idle");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   const currentVersion = __APP_VERSION__;
 
   const checkForUpdate = async () => {
     setUpdateStatus("checking");
     try {
-      const resp = await fetch(
-        "https://api.github.com/repos/Gaming-RF/Omni-Launcher-MC/releases?per_page=5",
-        { headers: { Accept: "application/vnd.github+json" } }
-      );
-      if (!resp.ok) throw new Error(`GitHub API ${resp.status}`);
-      const releases = await resp.json();
-      // Find latest non-draft, non-prerelease
-      const latest = releases.find((r: { draft: boolean; prerelease: boolean }) => !r.draft && !r.prerelease)
-        || releases.find((r: { draft: boolean }) => !r.draft)
-        || releases[0];
-      if (!latest) throw new Error("No releases found");
-
-      const tag = latest.tag_name.replace(/^v/, "");
-      setLatestVersion(tag);
-
-      // Find a download asset for current platform
-      const ua = navigator.userAgent.toLowerCase();
-      const isWindows = ua.includes("win");
-      const isMac = ua.includes("mac");
-      const isLinux = ua.includes("linux");
-
-      let asset: { browser_download_url: string; name: string } | undefined;
-
-      if (isWindows) {
-        // Prefer .exe (NSIS installer), then .msi
-        asset = latest.assets?.find((a: { name: string }) => a.name.endsWith(".exe"))
-          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".msi"));
-      } else if (isMac) {
-        const arch = ua.includes("arm") ? "aarch64" : "x64";
-        asset = latest.assets?.find((a: { name: string }) =>
-          a.name.endsWith(".dmg") && a.name.includes(arch)
-        );
-      } else if (isLinux) {
-        asset = latest.assets?.find((a: { name: string }) => a.name.endsWith(".deb"))
-          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".rpm"))
-          || latest.assets?.find((a: { name: string }) => a.name.endsWith(".AppImage"));
-      }
-
-      setDownloadUrl(asset?.browser_download_url || latest.html_url);
-
-      // Compare versions (simple string compare for semver)
-      if (tag !== currentVersion) {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (update) {
+        setLatestVersion(update.version);
         setUpdateStatus("available");
       } else {
         setUpdateStatus("none");
       }
     } catch (err) {
+      console.error("Update check failed:", err);
+      setUpdateStatus("error");
+    }
+  };
+
+  const installUpdate = async () => {
+    setUpdateStatus("installing");
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      const update = await check();
+      if (update) {
+        await update.downloadAndInstall();
+        await relaunch();
+      }
+    } catch (err) {
+      console.error("Update install failed:", err);
       setUpdateStatus("error");
     }
   };
@@ -388,13 +366,13 @@ function UpdateChecker() {
         App Updates
       </h2>
       <p className="text-sm text-slate-400 mb-4">
-        OmniLauncherMC v{currentVersion} — Check for the latest version on GitHub.
+        OmniLauncherMC v{currentVersion} — Auto-updates via Tauri updater.
       </p>
 
       <div className="flex items-center gap-3">
         <button
           onClick={checkForUpdate}
-          disabled={updateStatus === "checking"}
+          disabled={updateStatus === "checking" || updateStatus === "installing"}
           className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
         >
           {updateStatus === "checking" ? (
@@ -405,16 +383,19 @@ function UpdateChecker() {
           Check for Updates
         </button>
 
-        {updateStatus === "available" && downloadUrl && (
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+        {(updateStatus === "available" || updateStatus === "installing") && (
+          <button
+            onClick={installUpdate}
+            disabled={updateStatus === "installing"}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
-            <Download size={14} />
-            Download v{latestVersion}
-          </a>
+            {updateStatus === "installing" ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}
+            {updateStatus === "installing" ? "Installing..." : `Install v${latestVersion}`}
+          </button>
         )}
       </div>
 
@@ -432,6 +413,11 @@ function UpdateChecker() {
           <a href="https://github.com/Gaming-RF/Omni-Launcher-MC/releases" target="_blank" rel="noreferrer" className="underline">
             GitHub Releases
           </a>.
+        </p>
+      )}
+      {updateStatus === "installing" && (
+        <p className="text-sm text-blue-400 mt-3">
+          Downloading update... the app will restart automatically.
         </p>
       )}
     </section>
