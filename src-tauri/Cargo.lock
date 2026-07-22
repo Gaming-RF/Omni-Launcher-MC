@@ -2920,6 +2920,7 @@ dependencies = [
  "env_logger",
  "flate2",
  "futures",
+ "getrandom 0.2.17",
  "hex",
  "log",
  "md5",

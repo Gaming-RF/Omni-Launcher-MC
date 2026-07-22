@@ -2,32 +2,44 @@ use crate::api::auth;
 use crate::db;
 use crate::AppState;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct DeviceCodeInfo {
     pub user_code: String,
     pub verification_uri: String,
     pub message: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct AccountInfo {
     pub uuid: String,
     pub username: String,
     pub skin_url: Option<String>,
 }
 
+/// Start Microsoft login via device code flow.
+/// Returns the device code info for the frontend to display.
+/// The frontend will call poll_login repeatedly until the user completes auth.
 #[tauri::command]
-pub async fn start_login(state: State<'_, AppState>) -> Result<DeviceCodeInfo, String> {
+pub async fn start_login(
+    _app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<DeviceCodeInfo, String> {
     let device_code = auth::start_device_code_flow()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Device code error: {}", e))?;
 
-    // Store device_code temporarily in settings for polling
+    // Store device code temporarily
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db::settings::set_setting(&db, "_device_code", &device_code.device_code)
         .map_err(|e| e.to_string())?;
+    db::settings::set_setting(
+        &db,
+        "_device_code_expires",
+        &device_code.expires_in.to_string(),
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(DeviceCodeInfo {
         user_code: device_code.user_code,
@@ -36,9 +48,10 @@ pub async fn start_login(state: State<'_, AppState>) -> Result<DeviceCodeInfo, S
     })
 }
 
+/// Poll for login completion. Returns Ok(AccountInfo) when the user completes auth,
+/// or Err with status info if still waiting.
 #[tauri::command]
 pub async fn poll_login(state: State<'_, AppState>) -> Result<AccountInfo, String> {
-    // Get stored device code
     let device_code = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         db::settings::get_setting(&db, "_device_code")
@@ -69,13 +82,14 @@ pub async fn poll_login(state: State<'_, AppState>) -> Result<AccountInfo, Strin
         uuid: profile.id.clone(),
         username: profile.name.clone(),
         access_token: mc_token,
-        refresh_token: String::new(), // TODO: Store MSA refresh token
+        refresh_token: String::new(),
         skin_url,
     };
     db::accounts::upsert_account(&db, &account).map_err(|e| e.to_string())?;
 
-    // Clean up device code
+    // Clean up
     let _ = db::settings::delete_setting(&db, "_device_code");
+    let _ = db::settings::delete_setting(&db, "_device_code_expires");
 
     Ok(AccountInfo {
         uuid: account.uuid,
@@ -106,7 +120,6 @@ pub fn remove_account(state: State<'_, AppState>, uuid: String) -> Result<(), St
     Ok(())
 }
 
-/// Switch the active account. Reorders so the selected account is first.
 #[tauri::command]
 pub fn switch_active_account(
     state: State<'_, AppState>,
@@ -114,7 +127,6 @@ pub fn switch_active_account(
 ) -> Result<AccountInfo, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    // Set the active account timestamp to now (making it the most recent)
     db.execute(
         "UPDATE accounts SET last_used = ?1 WHERE uuid = ?2",
         rusqlite::params![chrono::Utc::now().to_rfc3339(), uuid],

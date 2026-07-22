@@ -1,11 +1,14 @@
 use anyhow::{Context, Result};
+use base64::Engine;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
-// Microsoft OAuth2 Device Code Flow constants
-// IMPORTANT: Replace with your own Azure AD app registration client ID
-const CLIENT_ID: &str = "YOUR_CLIENT_ID_HERE";
-const DEVICE_CODE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+// Microsoft OAuth2 - registered by PrismLauncher community
+// This is a public client (no secret needed) registered on Microsoft Identity Platform
+const CLIENT_ID: &str = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
+const REDIRECT_URI: &str = "http://localhost:12749/auth/callback";
+
+// Microsoft endpoints (consumers tenant = personal accounts only)
+const AUTHORIZE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
 const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const SCOPE: &str = "XboxLive.signin offline_access";
 
@@ -16,6 +19,13 @@ const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 // Minecraft services
 const MC_AUTH_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthCodeState {
+    pub code_verifier: String,
+    pub state: String,
+    pub port: u16,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeviceCodeResponse {
@@ -58,13 +68,109 @@ pub struct Cape {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Account {
-    pub uuid: String,
-    pub username: String,
-    pub access_token: String,
-    pub refresh_token: String,
-    pub skin_url: Option<String>,
+/// Generate a random string for PKCE/state
+fn random_string(len: usize) -> String {
+    let mut bytes = vec![0u8; len];
+    getrandom::getrandom(&mut bytes).expect("Failed to generate random bytes");
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&bytes)[..len].to_string()
+}
+
+/// SHA256 hash for PKCE challenge
+fn sha256(data: &[u8]) -> Vec<u8> {
+    use sha2::Digest;
+    sha2::Sha256::digest(data).to_vec()
+}
+
+/// Start the OAuth2 auth code flow with PKCE.
+/// Returns the authorization URL to open in the browser and the state needed for the callback.
+pub fn start_auth_code_flow() -> Result<(String, AuthCodeState)> {
+    let code_verifier = random_string(64);
+    let state = random_string(32);
+
+    // PKCE challenge = base64url(sha256(verifier))
+    let challenge =
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha256(code_verifier.as_bytes()));
+
+    let auth_url = format!(
+        "{}?client_id={}&response_type=code&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256&response_mode=query",
+        AUTHORIZE_URL,
+        CLIENT_ID,
+        urlencoding::encode(REDIRECT_URI),
+        urlencoding::encode(SCOPE),
+        state,
+        challenge,
+    );
+
+    // Parse port from redirect URI
+    let port = 12749u16;
+
+    Ok((
+        auth_url,
+        AuthCodeState {
+            code_verifier,
+            state,
+            port,
+        },
+    ))
+}
+
+/// Exchange an authorization code for tokens.
+pub async fn exchange_code(code: &str, code_verifier: &str) -> Result<(String, String)> {
+    let client = reqwest::Client::new();
+
+    let mut params = std::collections::HashMap::new();
+    params.insert("client_id", CLIENT_ID);
+    params.insert("code", code);
+    params.insert("redirect_uri", REDIRECT_URI);
+    params.insert("grant_type", "authorization_code");
+    params.insert("code_verifier", code_verifier);
+
+    let resp = client.post(TOKEN_URL).form(&params).send().await?;
+
+    let token_resp: TokenResponse = resp.json().await?;
+
+    if let Some(error) = &token_resp.error {
+        anyhow::bail!(
+            "Token error: {} - {}",
+            error,
+            token_resp.error_description.as_deref().unwrap_or("")
+        );
+    }
+
+    let access = token_resp
+        .access_token
+        .context("No access_token in response")?;
+    let refresh = token_resp
+        .refresh_token
+        .context("No refresh_token in response")?;
+
+    Ok((access, refresh))
+}
+
+/// Refresh an expired MSA token using the refresh token.
+pub async fn refresh_msa_token(refresh_token: &str) -> Result<(String, String)> {
+    let client = reqwest::Client::new();
+
+    let mut params = std::collections::HashMap::new();
+    params.insert("client_id", CLIENT_ID);
+    params.insert("refresh_token", refresh_token);
+    params.insert("grant_type", "refresh_token");
+
+    let resp = client.post(TOKEN_URL).form(&params).send().await?;
+    let token_resp: TokenResponse = resp.json().await?;
+
+    if let Some(error) = &token_resp.error {
+        anyhow::bail!("Refresh error: {}", error);
+    }
+
+    let access = token_resp
+        .access_token
+        .context("No access_token in refresh response")?;
+    let refresh = token_resp
+        .refresh_token
+        .unwrap_or_else(|| refresh_token.to_string());
+
+    Ok((access, refresh))
 }
 
 /// Start the Microsoft Device Code authentication flow.
@@ -72,12 +178,12 @@ pub struct Account {
 pub async fn start_device_code_flow() -> Result<DeviceCodeResponse> {
     let client = reqwest::Client::new();
 
-    let mut params = HashMap::new();
+    let mut params = std::collections::HashMap::new();
     params.insert("client_id", CLIENT_ID);
     params.insert("scope", SCOPE);
 
     let resp = client
-        .post(DEVICE_CODE_URL)
+        .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
         .form(&params)
         .send()
         .await
@@ -89,7 +195,13 @@ pub async fn start_device_code_flow() -> Result<DeviceCodeResponse> {
         .context("Failed to parse device code response")?;
 
     if let Some(error) = body.get("error") {
-        anyhow::bail!("Device code error: {}", error.as_str().unwrap_or("unknown"));
+        anyhow::bail!(
+            "Device code error: {} - {}",
+            error.as_str().unwrap_or("unknown"),
+            body.get("error_description")
+                .and_then(|d| d.as_str())
+                .unwrap_or("")
+        );
     }
 
     Ok(DeviceCodeResponse {
@@ -110,7 +222,7 @@ pub async fn start_device_code_flow() -> Result<DeviceCodeResponse> {
 pub async fn poll_for_token(device_code: &str) -> Result<(String, String)> {
     let client = reqwest::Client::new();
 
-    let mut params = HashMap::new();
+    let mut params = std::collections::HashMap::new();
     params.insert("client_id", CLIENT_ID);
     params.insert("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
     params.insert("device_code", device_code);
@@ -152,6 +264,7 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .post(XBL_AUTH_URL)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
+        .header("x-xbl-contract-version", "1")
         .json(&xbl_body)
         .send()
         .await?
@@ -187,7 +300,17 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
 
     if let Some(err_code) = xsts_resp["XErr"].as_i64() {
         if err_code != 0 {
-            anyhow::bail!("XSTS error code: {}", err_code);
+            let msg = match err_code {
+                2148916233 => "This Microsoft account does not have an Xbox account.",
+                2148916235 => {
+                    "This Xbox account is from a country/region where Xbox Live is not available."
+                }
+                2148916236 => "This Xbox account needs parental approval.",
+                2148916237 => "This Xbox account is banned.",
+                2148916238 => "This Microsoft account needs to complete adult verification.",
+                _ => "Xbox authentication failed.",
+            };
+            anyhow::bail!("XSTS error ({}): {}", err_code, msg);
         }
     }
 
@@ -220,13 +343,18 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
 pub async fn get_minecraft_profile(mc_token: &str) -> Result<MinecraftProfile> {
     let client = reqwest::Client::new();
 
-    let profile: MinecraftProfile = client
+    let resp = client
         .get(MC_PROFILE_URL)
         .header("Authorization", format!("Bearer {}", mc_token))
         .send()
-        .await?
-        .json()
         .await?;
 
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Profile fetch failed ({}): {}", status, body);
+    }
+
+    let profile: MinecraftProfile = resp.json().await?;
     Ok(profile)
 }

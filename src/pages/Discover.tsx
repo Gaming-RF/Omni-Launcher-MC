@@ -3,7 +3,6 @@ import {
   Search,
   Download,
   Loader2,
-  Globe,
   Package,
   X,
   CheckCircle,
@@ -50,11 +49,31 @@ export function Discover() {
   const [instances, setInstances] = useState<InstanceListItem[]>([]);
   const [installState, setInstallState] = useState<InstallState | null>(null);
   const [modpackInstallState, setModpackInstallState] = useState<ModpackInstallState | null>(null);
+  const [trendingMods, setTrendingMods] = useState<ModSearchResult[]>([]);
+  const [trendingModpacks, setTrendingModpacks] = useState<ModpackSearchResult[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
   const t = useI18nStore((s) => s.t);
 
-  // Load instances on mount
+  // Load instances and trending content on mount
   useEffect(() => {
     getInstances().then(setInstances).catch(console.error);
+
+    // Fetch popular/trending mods and modpacks
+    (async () => {
+      setTrendingLoading(true);
+      try {
+        const [mrMods, mrPacks] = await Promise.allSettled([
+          modrinthSearch("", 0, 20),
+          searchModpacksModrinth("", 0, 20),
+        ]);
+        if (mrMods.status === "fulfilled") setTrendingMods(mrMods.value);
+        if (mrPacks.status === "fulfilled") setTrendingModpacks(mrPacks.value);
+      } catch (err) {
+        console.error("Failed to load trending:", err);
+      } finally {
+        setTrendingLoading(false);
+      }
+    })();
   }, []);
 
   const handleSearch = useCallback(async () => {
@@ -310,18 +329,100 @@ export function Discover() {
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — show trending content */}
       {!hasSearched && currentResults.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-          <Globe size={48} className="mb-4 text-slate-600" />
-          <p className="text-lg font-medium text-slate-400">
-            {tab === "mods" ? "Search for mods" : "Search for modpacks"}
-          </p>
-          <p className="text-sm mt-1">
-            {tab === "mods"
-              ? "Find mods from Modrinth and CurseForge in one place"
-              : "Browse curated modpacks and install them in one click"}
-          </p>
+        <div className="space-y-8">
+          {/* Popular Mods */}
+          <div>
+            <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <Package size={18} className="text-blue-400" />
+              Popular Mods
+            </h2>
+            {trendingLoading ? (
+              <div className="flex items-center justify-center py-12 text-slate-500">
+                <Loader2 size={24} className="animate-spin mr-2" /> Loading popular mods...
+              </div>
+            ) : trendingMods.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {trendingMods.slice(0, 8).map((mod) => (
+                  <div
+                    key={`trending-${mod.source}-${mod.project_id}`}
+                    className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors cursor-pointer"
+                    onClick={() => handleInstallClick(mod)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {mod.icon_url ? (
+                        <img src={mod.icon_url} alt={mod.title} className="w-10 h-10 rounded-lg object-cover bg-slate-700" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
+                          <Package size={20} className="text-slate-500" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-white font-medium text-sm truncate">{mod.title}</h3>
+                          {sourceBadge(mod.source)}
+                        </div>
+                        <p className="text-xs text-slate-400 truncate">{mod.description}</p>
+                      </div>
+                      <span className="flex items-center gap-1 text-xs text-slate-500 shrink-0">
+                        <Download size={11} />
+                        {formatDownloads(mod.downloads)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-sm py-4">Could not load popular mods.</p>
+            )}
+          </div>
+
+          {/* Popular Modpacks */}
+          <div>
+            <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+              <Compass size={18} className="text-emerald-400" />
+              Popular Modpacks
+            </h2>
+            {trendingLoading ? (
+              <div className="flex items-center justify-center py-12 text-slate-500">
+                <Loader2 size={24} className="animate-spin mr-2" /> Loading popular modpacks...
+              </div>
+            ) : trendingModpacks.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {trendingModpacks.slice(0, 8).map((mp) => (
+                  <div
+                    key={`trending-pack-${mp.source}-${mp.project_id}`}
+                    className="bg-slate-800 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors cursor-pointer"
+                    onClick={() => handleModpackInstall(mp)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {mp.icon_url ? (
+                        <img src={mp.icon_url} alt={mp.title} className="w-10 h-10 rounded-lg object-cover bg-slate-700" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center">
+                          <Compass size={20} className="text-slate-500" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-white font-medium text-sm truncate">{mp.title}</h3>
+                          {sourceBadge(mp.source)}
+                        </div>
+                        <p className="text-xs text-slate-400 truncate">{mp.description}</p>
+                      </div>
+                      <span className="flex items-center gap-1 text-xs text-slate-500 shrink-0">
+                        <Download size={11} />
+                        {formatDownloads(mp.downloads)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-sm py-4">Could not load popular modpacks.</p>
+            )}
+          </div>
         </div>
       ) : noResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">

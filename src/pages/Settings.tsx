@@ -13,6 +13,7 @@ import {
   Loader2,
   LogIn,
   RefreshCw,
+  Download,
   Trash2,
 } from "lucide-react";
 import JavaPicker from "../components/common/JavaPicker";
@@ -319,49 +320,55 @@ export function Settings() {
 
 function UpdateChecker() {
   const [updateStatus, setUpdateStatus] = useState<
-    "idle" | "checking" | "available" | "downloading" | "ready" | "none" | "error"
+    "idle" | "checking" | "available" | "none" | "error"
   >("idle");
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const updateRef = useRef<ReturnType<typeof import("@tauri-apps/plugin-updater").check> extends Promise<infer T> ? T : never>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  const currentVersion = __APP_VERSION__;
 
   const checkForUpdate = async () => {
     setUpdateStatus("checking");
-    setError(null);
     try {
-      const { check } = await import("@tauri-apps/plugin-updater");
-      const update = await check();
-      if (update) {
-        updateRef.current = update as NonNullable<typeof update>;
-        setUpdateVersion(update.version);
+      const resp = await fetch(
+        "https://api.github.com/repos/Gaming-RF/Omni-Launcher-MC/releases?per_page=5",
+        { headers: { Accept: "application/vnd.github+json" } }
+      );
+      if (!resp.ok) throw new Error(`GitHub API ${resp.status}`);
+      const releases = await resp.json();
+      // Find latest non-draft, non-prerelease
+      const latest = releases.find((r: { draft: boolean; prerelease: boolean }) => !r.draft && !r.prerelease)
+        || releases.find((r: { draft: boolean }) => !r.draft)
+        || releases[0];
+      if (!latest) throw new Error("No releases found");
+
+      const tag = latest.tag_name.replace(/^v/, "");
+      setLatestVersion(tag);
+
+      // Find a download asset for current platform
+      const ua = navigator.userAgent.toLowerCase();
+      let platform = "x64";
+      if (ua.includes("mac")) platform = ua.includes("arm") ? "aarch64" : "x64";
+      if (ua.includes("linux")) platform = "amd64";
+
+      const msi = latest.assets?.find((a: { name: string }) =>
+        a.name.endsWith(".msi") && a.name.includes(platform)
+      );
+      const dmg = latest.assets?.find((a: { name: string }) =>
+        a.name.endsWith(".dmg") && (a.name.includes(platform) || a.name.includes("x64"))
+      );
+      const deb = latest.assets?.find((a: { name: string }) => a.name.endsWith(".deb"));
+
+      setDownloadUrl(msi?.browser_download_url || dmg?.browser_download_url || deb?.browser_download_url || latest.html_url);
+
+      // Compare versions (simple string compare for semver)
+      if (tag !== currentVersion) {
         setUpdateStatus("available");
       } else {
         setUpdateStatus("none");
       }
     } catch (err) {
       setUpdateStatus("error");
-      setError(String(err));
-    }
-  };
-
-  const installUpdate = async () => {
-    if (!updateRef.current) return;
-    setUpdateStatus("downloading");
-    try {
-      await updateRef.current.downloadAndInstall();
-      setUpdateStatus("ready");
-    } catch (err) {
-      setUpdateStatus("error");
-      setError(String(err));
-    }
-  };
-
-  const restartApp = async () => {
-    try {
-      const { relaunch } = await import("@tauri-apps/plugin-process");
-      await relaunch();
-    } catch (err) {
-      setError(String(err));
     }
   };
 
@@ -372,13 +379,13 @@ function UpdateChecker() {
         App Updates
       </h2>
       <p className="text-sm text-slate-400 mb-4">
-        OmniLauncherMC v{__APP_VERSION__} — Check for the latest version on GitHub.
+        OmniLauncherMC v{currentVersion} — Check for the latest version on GitHub.
       </p>
 
       <div className="flex items-center gap-3">
         <button
           onClick={checkForUpdate}
-          disabled={updateStatus === "checking" || updateStatus === "downloading"}
+          disabled={updateStatus === "checking"}
           className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
         >
           {updateStatus === "checking" ? (
@@ -389,50 +396,33 @@ function UpdateChecker() {
           Check for Updates
         </button>
 
-        {updateStatus === "available" && (
-          <button
-            onClick={installUpdate}
+        {updateStatus === "available" && downloadUrl && (
+          <a
+            href={downloadUrl}
+            target="_blank"
+            rel="noreferrer"
             className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
-            <Cpu size={14} />
-            Install Update
-          </button>
-        )}
-
-        {updateStatus === "ready" && (
-          <button
-            onClick={restartApp}
-            className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <RefreshCw size={14} />
-            Restart Now
-          </button>
+            <Download size={14} />
+            Download v{latestVersion}
+          </a>
         )}
       </div>
 
-      {updateStatus === "available" && updateVersion && (
+      {updateStatus === "available" && latestVersion && (
         <p className="text-sm text-emerald-400 mt-3">
-          Update available: v{updateVersion}
-        </p>
-      )}
-      {updateStatus === "downloading" && (
-        <p className="text-sm text-blue-400 mt-3 flex items-center gap-2">
-          <Loader2 size={12} className="animate-spin" /> Downloading update...
-        </p>
-      )}
-      {updateStatus === "ready" && (
-        <p className="text-sm text-amber-400 mt-3">
-          Update downloaded. Restart to apply.
+          Update available: v{latestVersion} (current: v{currentVersion})
         </p>
       )}
       {updateStatus === "none" && (
-        <p className="text-sm text-slate-500 mt-3">You're on the latest version.</p>
+        <p className="text-sm text-slate-500 mt-3">You're on the latest version (v{currentVersion}).</p>
       )}
       {updateStatus === "error" && (
         <p className="text-sm text-red-400 mt-3">
-          {error?.includes("network") || error?.includes("fetch")
-            ? "Unable to check for updates. Check your internet connection."
-            : error}
+          Unable to check for updates. Try{" "}
+          <a href="https://github.com/Gaming-RF/Omni-Launcher-MC/releases" target="_blank" rel="noreferrer" className="underline">
+            GitHub Releases
+          </a>.
         </p>
       )}
     </section>
