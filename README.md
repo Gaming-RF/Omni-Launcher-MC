@@ -42,18 +42,36 @@ Most Minecraft launchers lock you into a single mod platform. OmniLauncherMC let
 
 ## Getting Started
 
-### Prerequisites
+### One-Command Install (builds from source — always latest)
 
+**Linux / macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/Gaming-RF/Omni-Launcher-MC/main/install.ps1 | iex
+```
+
+The installers automatically install all dependencies (Rust, Node.js, pnpm, system libs), clone the repo, and build from source. To update later, run `omni-launcher-mc-update`.
+
+### Manual Build
+
+<details>
+<summary>Click to expand manual build instructions</summary>
+
+**Prerequisites:**
 - [Rust](https://rustup.rs/) 1.70+
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/) 9+
-- **Linux only:**
-  ```bash
-  sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libssl-dev
-  ```
 
-### Install & Run
+**Linux system deps:**
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libssl-dev libgtk-3-dev libappindicator3-dev patchelf librsvg2-dev
+```
 
+**Clone and run:**
 ```bash
 git clone https://github.com/Gaming-RF/Omni-Launcher-MC.git
 cd Omni-Launcher-MC
@@ -61,13 +79,14 @@ pnpm install
 pnpm tauri dev
 ```
 
-### Build Release
-
+**Build release:**
 ```bash
 pnpm tauri build
 ```
 
 The built binary will be in `src-tauri/target/release/`.
+
+</details>
 
 ## Architecture
 
