@@ -184,9 +184,9 @@ If adding new external domains, update the `csp` field in `tauri.conf.json`.
 
 | Change type | Version bump | Example |
 |-------------|-------------|---------|
-| Bug fix | patch (0.0.1) | 0.2.2 → 0.2.3 |
-| Minor/feature update | minor (0.1.0) | 0.2.3 → 0.3.0 |
-| Big/major update | major (1.0.0) | 0.3.0 → 1.0.0 |
+| Bug fix | +0.01 | 0.2.3 → 0.2.4 |
+| Minor/feature update | +0.1 | 0.2.4 → 0.3.0 |
+| Big/major update | +1.0 | 0.3.0 → 1.0.0 |
 
 Always update version in both `package.json` and `src-tauri/tauri.conf.json`.
 
