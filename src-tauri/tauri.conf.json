@@ -53,12 +53,5 @@
       }
     }
   },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/Gaming-RF/Omni-Launcher-MC/releases/latest/download/latest.json"
-      ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ2OEIyRjM2Q0I2QjgyMzAKUldRd2dtdkxOaStMUm4zYUcrU09YYUFNVDd5WlJzTGlvWnJ3Smtqd0EzTTd1ek5XUTZDNW5uOSsK"
-    }
-  }
+  "plugins": {}
 }
