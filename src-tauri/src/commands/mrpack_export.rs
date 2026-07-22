@@ -78,10 +78,7 @@ fn compute_hashes(path: &std::path::Path) -> anyhow::Result<(String, String)> {
         sha512.update(&buf[..n]);
     }
 
-    Ok((
-        hex::encode(sha1.finalize()),
-        hex::encode(sha512.finalize()),
-    ))
+    Ok((hex::encode(sha1.finalize()), hex::encode(sha512.finalize())))
 }
 
 /// Map a loader name to the Modrinth mrpack dependency key.
@@ -114,7 +111,14 @@ fn add_dir_to_zip(
         };
 
         if entry.file_type()?.is_dir() {
-            add_dir_to_zip(zip, &entry.path(), &zip_path, options, total_size, file_count)?;
+            add_dir_to_zip(
+                zip,
+                &entry.path(),
+                &zip_path,
+                options,
+                total_size,
+                file_count,
+            )?;
         } else {
             let mut f = std::fs::File::open(entry.path())?;
             let meta = f.metadata()?;
@@ -218,8 +222,7 @@ fn build_mrpack_zip(
             .map_err(|e| format!("Cannot create output directory: {e}"))?;
     }
 
-    let file = std::fs::File::create(dest_path)
-        .map_err(|e| format!("Cannot create file: {e}"))?;
+    let file = std::fs::File::create(dest_path).map_err(|e| format!("Cannot create file: {e}"))?;
     let mut zip = zip::ZipWriter::new(file);
     let opts = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
@@ -238,8 +241,8 @@ fn build_mrpack_zip(
 
     // 2. Override mod files (CurseForge mods, mods without hashes)
     for (fname, path) in &override_mods {
-        let mut f = std::fs::File::open(path)
-            .map_err(|e| format!("Failed to read mod {fname}: {e}"))?;
+        let mut f =
+            std::fs::File::open(path).map_err(|e| format!("Failed to read mod {fname}: {e}"))?;
         let meta = f.metadata().map_err(|e| e.to_string())?;
         let mut buf = Vec::new();
         f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
@@ -311,8 +314,7 @@ pub async fn export_mrpack(
         let instance = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
             .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id)
-            .map_err(|e| e.to_string())?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
         (instance, mods)
     };
 
@@ -323,7 +325,13 @@ pub async fn export_mrpack(
     let safe_name: String = instance
         .name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let dest = exports_dir.join(format!("{safe_name}.mrpack"));
 
@@ -352,8 +360,7 @@ pub async fn export_mrpack_to_path(
         let instance = db::instances::get_instance(&db, &instance_id)
             .map_err(|e| e.to_string())?
             .ok_or("Instance not found")?;
-        let mods = db::mods::get_instance_mods(&db, &instance_id)
-            .map_err(|e| e.to_string())?;
+        let mods = db::mods::get_instance_mods(&db, &instance_id).map_err(|e| e.to_string())?;
         (instance, mods)
     };
 

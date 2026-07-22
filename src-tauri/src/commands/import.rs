@@ -84,7 +84,10 @@ pub async fn import_launcher_instance(
         play_time_secs: 0,
         java_args: None,
         resolution: None,
-        notes: Some(format!("Imported from {:?}: {}", launcher_type, source_path)),
+        notes: Some(format!(
+            "Imported from {:?}: {}",
+            launcher_type, source_path
+        )),
         groups: None,
         allocated_memory_mb: 4096,
         java_installation_id: None,
@@ -161,10 +164,7 @@ fn detect_launcher_path(launcher_type: &LauncherType) -> PathBuf {
                 .unwrap_or(home.join(".local/share/PrismLauncher"))
         }
         LauncherType::CurseForgeApp => {
-            let candidates = [
-                home.join(".curseforge"),
-                PathBuf::from("/opt/curseforge"),
-            ];
+            let candidates = [home.join(".curseforge"), PathBuf::from("/opt/curseforge")];
             candidates
                 .into_iter()
                 .find(|p| p.exists())
@@ -276,8 +276,7 @@ async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableIns
                         loader_version = Some(id.strip_prefix("forge-").unwrap_or(id).to_string());
                     } else if id.starts_with("fabric-") {
                         loader = "fabric".to_string();
-                        loader_version =
-                            Some(id.strip_prefix("fabric-").unwrap_or(id).to_string());
+                        loader_version = Some(id.strip_prefix("fabric-").unwrap_or(id).to_string());
                     }
                 }
             }
@@ -324,10 +323,7 @@ async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
         let data: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
 
         let name = data["name"].as_str().unwrap_or("Unknown").to_string();
-        let game_version = data["minecraftVersion"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let game_version = data["minecraftVersion"].as_str().unwrap_or("").to_string();
 
         let mut loader = "vanilla".to_string();
         let mut loader_version = None;
@@ -373,9 +369,7 @@ async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
             continue;
         }
 
-        let content = tokio::fs::read_to_string(&config)
-            .await
-            .unwrap_or_default();
+        let content = tokio::fs::read_to_string(&config).await.unwrap_or_default();
 
         let data: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
 
@@ -429,10 +423,7 @@ async fn scan_vanilla(base: &std::path::Path) -> Result<Vec<ImportableInstance>,
     if let Some(profiles) = data["profiles"].as_object() {
         for (id, profile) in profiles {
             let name = profile["name"].as_str().unwrap_or(id).to_string();
-            let game_version = profile["lastVersionId"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
+            let game_version = profile["lastVersionId"].as_str().unwrap_or("").to_string();
 
             // Skip versions that look like "latest-snapshot" etc
             if game_version.starts_with("latest-") || game_version.is_empty() {

@@ -17,11 +17,11 @@ pub async fn search(req: &UnifiedSearchRequest) -> anyhow::Result<Vec<UnifiedSea
     }
 
     let class_id = req.resource_type.as_ref().map(|rt| match rt {
-        ResourceType::Mod => 6,       // Mods
-        ResourceType::Modpack => 4471, // Modpacks
+        ResourceType::Mod => 6,           // Mods
+        ResourceType::Modpack => 4471,    // Modpacks
         ResourceType::ResourcePack => 12, // Texture Packs
-        ResourceType::Shader => 6552,  // Shaders
-        ResourceType::DataPack => 6945, // Data Packs
+        ResourceType::Shader => 6552,     // Shaders
+        ResourceType::DataPack => 6945,   // Data Packs
     });
 
     let sort_field = match req.sort.as_ref().unwrap_or(&SortOrder::Relevance) {
@@ -110,11 +110,7 @@ pub async fn get_versions(
     }
 
     let id: i32 = mod_id.parse()?;
-    let mut url = format!(
-        "{}/v1/mods/{}/files?pageSize=50",
-        curseforge::BASE_URL,
-        id
-    );
+    let mut url = format!("{}/v1/mods/{}/files?pageSize=50", curseforge::BASE_URL, id);
     if let Some(gv) = game_version {
         url.push_str(&format!("&gameVersion={gv}"));
     }
@@ -143,7 +139,11 @@ pub async fn get_versions(
 
             let game_versions: Vec<String> = f["gameVersions"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             let hashes = f["hashes"].as_array().cloned().unwrap_or_default();
@@ -240,7 +240,11 @@ pub async fn get_project(mod_id: &str) -> anyhow::Result<UnifiedProjectDetails> 
         downloads: m["downloadCount"].as_i64().unwrap_or(0).max(0) as u64,
         categories: m["categories"]
             .as_array()
-            .map(|a| a.iter().filter_map(|c| c["name"].as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|c| c["name"].as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default(),
         project_type: "mod".to_string(),
         source_url: m["links"]["sourceUrl"].as_str().map(String::from),

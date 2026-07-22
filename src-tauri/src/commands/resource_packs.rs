@@ -96,7 +96,12 @@ fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), S
         };
         if alt.exists() {
             let target = if enabled {
-                dir.join(alt.file_name().unwrap().to_string_lossy().trim_start_matches('_'))
+                dir.join(
+                    alt.file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .trim_start_matches('_'),
+                )
             } else {
                 dir.join(format!("_{}", alt.file_name().unwrap().to_string_lossy()))
             };
@@ -157,11 +162,7 @@ pub fn toggle_resource_pack(
 }
 
 #[tauri::command]
-pub fn toggle_shader(
-    instance_id: String,
-    filename: String,
-    enabled: bool,
-) -> Result<(), String> {
+pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Result<(), String> {
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)

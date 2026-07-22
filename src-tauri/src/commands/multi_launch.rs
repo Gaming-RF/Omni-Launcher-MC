@@ -34,10 +34,7 @@ pub fn get_all_running_instances(
 }
 
 #[tauri::command]
-pub fn terminate_instance(
-    state: State<'_, AppState>,
-    instance_id: String,
-) -> Result<(), String> {
+pub fn terminate_instance(state: State<'_, AppState>, instance_id: String) -> Result<(), String> {
     state.process_manager.kill(&instance_id)
 }
 

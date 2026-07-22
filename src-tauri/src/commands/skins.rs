@@ -31,11 +31,7 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, String> {
     );
 
     let client = reqwest::Client::new();
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
 
     if !resp.status().is_success() {
         return Err(format!("Failed to fetch profile: {}", resp.status()));
@@ -53,11 +49,9 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, String> {
                 if let Some(value_str) = prop["value"].as_str() {
                     // Base64 decode the textures value
                     use base64::Engine;
-                    if let Ok(decoded) =
-                        base64::engine::general_purpose::STANDARD.decode(value_str)
+                    if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(value_str)
                     {
-                        if let Ok(textures) =
-                            serde_json::from_slice::<serde_json::Value>(&decoded)
+                        if let Ok(textures) = serde_json::from_slice::<serde_json::Value>(&decoded)
                         {
                             if let Some(skin) = textures["textures"]["SKIN"].as_object() {
                                 skin_url = skin["url"].as_str().map(|s| s.to_string());

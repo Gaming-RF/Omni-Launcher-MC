@@ -90,25 +90,39 @@ pub fn apply_graphics_settings(instance_id: String) -> Result<(), String> {
         std::collections::HashMap::new()
     };
 
-    options.insert("renderDistance".into(), settings.render_distance.to_string());
-    options.insert("simulationDistance".into(), settings.simulation_distance.to_string());
+    options.insert(
+        "renderDistance".into(),
+        settings.render_distance.to_string(),
+    );
+    options.insert(
+        "simulationDistance".into(),
+        settings.simulation_distance.to_string(),
+    );
     options.insert("fov".into(), settings.fov.to_string());
     options.insert("guiScale".into(), settings.gui_scale.to_string());
     options.insert("maxFps".into(), settings.max_fps.to_string());
     options.insert("enableVsync".into(), settings.vsync.to_string());
-    options.insert("graphicsMode".into(), match settings.graphics.as_str() {
-        "fast" => "0",
-        _ => "1",
-    }.to_string());
+    options.insert(
+        "graphicsMode".into(),
+        match settings.graphics.as_str() {
+            "fast" => "0",
+            _ => "1",
+        }
+        .to_string(),
+    );
     options.insert("ao".into(), settings.smooth_lighting.to_string());
     options.insert("particleOption".into(), settings.particles.to_string());
     options.insert("entityShadows".into(), settings.entity_shadows.to_string());
     options.insert("biomeBlendRadius".into(), settings.biome_blend.to_string());
-    options.insert("renderClouds".into(), match settings.clouds.as_str() {
-        "off" => "false",
-        "fast" => "fast",
-        _ => "true",
-    }.to_string());
+    options.insert(
+        "renderClouds".into(),
+        match settings.clouds.as_str() {
+            "off" => "false",
+            "fast" => "fast",
+            _ => "true",
+        }
+        .to_string(),
+    );
     options.insert("fullscreen".into(), settings.fullscreen.to_string());
     options.insert("mipmapLevels".into(), settings.mipmap_levels.to_string());
 

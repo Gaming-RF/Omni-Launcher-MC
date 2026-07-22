@@ -175,13 +175,23 @@ pub async fn get_project(project_id: &str) -> anyhow::Result<UnifiedProjectDetai
         downloads: resp["downloads"].as_u64().unwrap_or(0),
         categories: resp["categories"]
             .as_array()
-            .map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|c| c.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default(),
         project_type: map_project_type(resp["project_type"].as_str().unwrap_or("mod")),
         source_url: resp["source_url"].as_str().map(String::from),
         wiki_url: resp["wiki_url"].as_str().map(String::from),
         issues_url: resp["issues_url"].as_str().map(String::from),
-        date_created: resp["date_created"].as_str().unwrap_or_default().to_string(),
-        date_modified: resp["date_modified"].as_str().unwrap_or_default().to_string(),
+        date_created: resp["date_created"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        date_modified: resp["date_modified"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
     })
 }

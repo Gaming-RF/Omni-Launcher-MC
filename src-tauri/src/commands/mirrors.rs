@@ -70,12 +70,9 @@ pub fn set_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<(), S
 /// Test a single mirror's latency by sending an HTTP HEAD request.
 /// Returns latency in milliseconds.
 #[tauri::command]
-pub async fn test_mirror(
-    state: State<'_, AppState>,
-    mirror_id: String,
-) -> Result<u64, String> {
-    let mirror = Mirror::from_id(&mirror_id)
-        .ok_or_else(|| format!("Unknown mirror id: {}", mirror_id))?;
+pub async fn test_mirror(state: State<'_, AppState>, mirror_id: String) -> Result<u64, String> {
+    let mirror =
+        Mirror::from_id(&mirror_id).ok_or_else(|| format!("Unknown mirror id: {}", mirror_id))?;
 
     // Use a well-known Mojang URL resolved through the mirror as the test target.
     let test_url = resolve_url(
@@ -106,9 +103,7 @@ pub async fn test_mirror(
 
 /// Test all mirrors and return results with latency info.
 #[tauri::command]
-pub async fn test_all_mirrors(
-    state: State<'_, AppState>,
-) -> Result<Vec<MirrorInfo>, String> {
+pub async fn test_all_mirrors(state: State<'_, AppState>) -> Result<Vec<MirrorInfo>, String> {
     let active_id = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         active_mirror_id(&db)
@@ -154,10 +149,7 @@ pub async fn test_all_mirrors(
 
 /// Resolve a Mojang download URL through the currently-selected mirror.
 #[tauri::command]
-pub fn resolve_download_url(
-    state: State<'_, AppState>,
-    url: String,
-) -> Result<String, String> {
+pub fn resolve_download_url(state: State<'_, AppState>, url: String) -> Result<String, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let active_id = active_mirror_id(&db);
     let mirror = Mirror::from_id(&active_id).unwrap_or(Mirror::Official);

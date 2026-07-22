@@ -124,7 +124,10 @@ async fn fetch_fabric(
         .collect();
 
     let latest = versions.first().map(|v| v.version.clone());
-    let recommended = versions.iter().find(|v| v.stable).map(|v| v.version.clone());
+    let recommended = versions
+        .iter()
+        .find(|v| v.stable)
+        .map(|v| v.version.clone());
 
     Ok(ModloaderMatrixEntry {
         loader: "fabric".into(),
@@ -265,7 +268,10 @@ async fn fetch_neoforge(
     versions.truncate(20);
 
     let latest = versions.first().map(|v| v.version.clone());
-    let recommended = versions.iter().find(|v| v.stable).map(|v| v.version.clone());
+    let recommended = versions
+        .iter()
+        .find(|v| v.stable)
+        .map(|v| v.version.clone());
 
     Ok(ModloaderMatrixEntry {
         loader: "neoforge".into(),

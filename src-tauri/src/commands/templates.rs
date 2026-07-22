@@ -1,6 +1,6 @@
-use crate::AppState;
 use crate::commands::instances::InstanceListItem;
 use crate::db;
+use crate::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -194,7 +194,9 @@ fn get_custom_templates_db(db: &rusqlite::Connection) -> Result<Vec<TemplateInfo
                 mods,
                 is_custom: true,
                 category: "custom".into(),
-                icon: row.get::<_, Option<String>>(7)?.unwrap_or_else(|| "📦".into()),
+                icon: row
+                    .get::<_, Option<String>>(7)?
+                    .unwrap_or_else(|| "📦".into()),
             })
         })
         .map_err(|e| e.to_string())?;
@@ -236,7 +238,10 @@ pub fn create_instance_from_template(
         .find(|t| t.id == template_id)
         .or_else(|| {
             let db = state.db.lock().ok()?;
-            get_custom_templates_db(&db).ok()?.into_iter().find(|t| t.id == template_id)
+            get_custom_templates_db(&db)
+                .ok()?
+                .into_iter()
+                .find(|t| t.id == template_id)
         })
         .ok_or_else(|| format!("Template '{}' not found", template_id))?;
 

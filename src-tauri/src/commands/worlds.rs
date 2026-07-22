@@ -133,7 +133,9 @@ pub async fn ping_server(address: String) -> Result<ServerStatus, String> {
     };
 
     let stream = TcpStream::connect_timeout(
-        &addr.parse().map_err(|_| "Invalid server address".to_string())?,
+        &addr
+            .parse()
+            .map_err(|_| "Invalid server address".to_string())?,
         Duration::from_secs(5),
     )
     .map_err(|e| format!("Cannot connect: {}", e))?;
@@ -213,10 +215,7 @@ pub async fn rename_world(
 
 /// Backup a singleplayer world by copying its folder.
 #[tauri::command]
-pub async fn backup_world(
-    instance_id: String,
-    folder_name: String,
-) -> Result<String, String> {
+pub async fn backup_world(instance_id: String, folder_name: String) -> Result<String, String> {
     let saves_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -375,10 +374,7 @@ fn read_compound_contents(
     Some(map)
 }
 
-fn read_nbt_value(
-    reader: &mut std::io::Cursor<&Vec<u8>>,
-    tag_type: u8,
-) -> Option<NbtValue> {
+fn read_nbt_value(reader: &mut std::io::Cursor<&Vec<u8>>, tag_type: u8) -> Option<NbtValue> {
     use std::io::Read;
 
     let mut buf8 = [0u8; 1];
@@ -505,9 +501,7 @@ async fn write_servers_dat(path: &std::path::Path, servers: &[ServerEntry]) -> R
     use std::io::Write;
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    encoder
-        .write_all(&nbt_data)
-        .map_err(|e| e.to_string())?;
+    encoder.write_all(&nbt_data).map_err(|e| e.to_string())?;
     let compressed = encoder.finish().map_err(|e| e.to_string())?;
 
     tokio::fs::write(path, compressed)
@@ -530,7 +524,9 @@ fn write_nbt_string_tag(data: &mut Vec<u8>, name: &str, value: &str) {
 }
 
 /// Scan singleplayer worlds in the saves directory.
-async fn scan_singleplayer_worlds(saves_dir: &std::path::Path) -> Result<Vec<SingleplayerWorld>, String> {
+async fn scan_singleplayer_worlds(
+    saves_dir: &std::path::Path,
+) -> Result<Vec<SingleplayerWorld>, String> {
     if !saves_dir.exists() {
         return Ok(vec![]);
     }

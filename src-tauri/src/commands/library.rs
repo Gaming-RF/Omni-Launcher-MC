@@ -63,7 +63,10 @@ fn scan_type(item_type: &str) -> Vec<LibraryItem> {
                 .to_string(),
             file_name,
             item_type: item_type.to_string(),
-            source: meta.get("source").and_then(|v| v.as_str()).map(String::from),
+            source: meta
+                .get("source")
+                .and_then(|v| v.as_str())
+                .map(String::from),
             file_size,
             added_at: meta
                 .get("added_at")
@@ -127,10 +130,7 @@ pub fn list_library_items(item_type: Option<String>) -> Result<Vec<LibraryItem>,
 }
 
 #[tauri::command]
-pub fn import_to_library(
-    instance_id: String,
-    file_name: String,
-) -> Result<LibraryItem, String> {
+pub fn import_to_library(instance_id: String, file_name: String) -> Result<LibraryItem, String> {
     let instances = data_dir().join("instances").join(&instance_id);
     // Try mods/, resourcepacks/, shaderpacks/
     let (src_path, item_type) = [
@@ -184,7 +184,10 @@ pub fn import_to_library(
     let size = fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
     Ok(LibraryItem {
         id: hash,
-        name: file_name.trim_end_matches(".jar").trim_end_matches(".zip").to_string(),
+        name: file_name
+            .trim_end_matches(".jar")
+            .trim_end_matches(".zip")
+            .to_string(),
         file_name,
         item_type: item_type.to_string(),
         source: Some("manual".into()),

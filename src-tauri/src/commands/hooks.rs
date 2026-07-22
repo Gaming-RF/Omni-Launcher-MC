@@ -53,10 +53,7 @@ pub fn update_instance_hooks(
 }
 
 /// Execute a pre-launch hook command.
-pub async fn execute_pre_launch(
-    instance_id: &str,
-    hooks: &InstanceHooks,
-) -> Result<(), String> {
+pub async fn execute_pre_launch(instance_id: &str, hooks: &InstanceHooks) -> Result<(), String> {
     if let Some(ref cmd) = hooks.pre_launch_cmd {
         if cmd.is_empty() {
             return Ok(());
@@ -80,10 +77,7 @@ pub async fn execute_pre_launch(
 }
 
 /// Execute a post-exit hook command.
-pub async fn execute_post_exit(
-    instance_id: &str,
-    hooks: &InstanceHooks,
-) -> Result<(), String> {
+pub async fn execute_post_exit(instance_id: &str, hooks: &InstanceHooks) -> Result<(), String> {
     if let Some(ref cmd) = hooks.post_exit_cmd {
         if cmd.is_empty() {
             return Ok(());

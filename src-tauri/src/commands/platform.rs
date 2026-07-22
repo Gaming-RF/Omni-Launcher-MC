@@ -1,15 +1,13 @@
 // Unified platform commands — search, versions, details from both Modrinth + CurseForge
 
-use crate::platforms::{
-    self, ModSource, ResourceType, SortOrder, UnifiedSearchRequest,
-};
+use crate::platforms::{self, ModSource, ResourceType, SortOrder, UnifiedSearchRequest};
 use serde::{Deserialize, Serialize};
 use tauri::command;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlatformSearchArgs {
     pub query: String,
-    pub source: Option<String>,        // "modrinth", "curseforge", or null (both)
+    pub source: Option<String>, // "modrinth", "curseforge", or null (both)
     pub resource_type: Option<String>, // "mod", "modpack", "resourcepack", "shader", "datapack"
     pub game_version: Option<String>,
     pub loader: Option<String>,
@@ -76,20 +74,21 @@ pub async fn get_mod_versions_unified(
         _ => return Err("Invalid source".to_string()),
     };
 
-    let versions =
-        platforms::get_project_versions(&src, &project_id, game_version.as_deref(), loader.as_deref())
-            .await
-            .map_err(|e| e.to_string())?;
+    let versions = platforms::get_project_versions(
+        &src,
+        &project_id,
+        game_version.as_deref(),
+        loader.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
     serde_json::to_string(&versions).map_err(|e| e.to_string())
 }
 
 /// Get project details from a specific source
 #[command]
-pub async fn get_mod_details_unified(
-    source: String,
-    project_id: String,
-) -> Result<String, String> {
+pub async fn get_mod_details_unified(source: String, project_id: String) -> Result<String, String> {
     let src = match source.as_str() {
         "modrinth" => ModSource::Modrinth,
         "curseforge" => ModSource::CurseForge,

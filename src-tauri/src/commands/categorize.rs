@@ -21,16 +21,116 @@ pub struct CategorizedMod {
 }
 
 const KNOWN_CATEGORIES: &[(&str, &str, &[&str])] = &[
-    ("performance", "Performance", &["sodium", "lithium", "starlight", "ferritecore", "krypton", "lazydfu", "c2me"]),
-    ("optimization", "Graphics Optimization", &["iris", "canvas", "optifine", "embeddium", "oculus"]),
-    ("worldgen", "World Generation", &["terralith", "biomesoplenty", "oh-the-biomes", "tectonic", "regions-unexplored"]),
-    ("tech", "Technology", &["create", "mekanism", "appliedenergistics", "refined-storage", "immersive-engineering", "ae2"]),
-    ("magic", "Magic", &["botania", "ars-nouveau", "blood-magic", "occultism", "evilcraft"]),
-    ("adventure", "Adventure", &["twilight-forest", "aether", "dungeons", "better-dungeons", "yungs"]),
-    ("utility", "Utility", &["jei", "rei", "wthit", "jade", "emi", "crafttweaker", "kubejs"]),
-    ("library", "Library/API", &["fabric-api", "forge", "cloth-config", "architectury", "fabric-language-kotlin", "quilted-fabric-api"]),
-    ("qol", "Quality of Life", &["appleskin", "journeymap", "minimap", "inventory-hud", "xaeros", "mouse-tweaks"]),
-    ("cosmetic", "Cosmetic", &["fresh-animations", "entity-texture-features", "continuity", "lambdynamiclights"]),
+    (
+        "performance",
+        "Performance",
+        &[
+            "sodium",
+            "lithium",
+            "starlight",
+            "ferritecore",
+            "krypton",
+            "lazydfu",
+            "c2me",
+        ],
+    ),
+    (
+        "optimization",
+        "Graphics Optimization",
+        &["iris", "canvas", "optifine", "embeddium", "oculus"],
+    ),
+    (
+        "worldgen",
+        "World Generation",
+        &[
+            "terralith",
+            "biomesoplenty",
+            "oh-the-biomes",
+            "tectonic",
+            "regions-unexplored",
+        ],
+    ),
+    (
+        "tech",
+        "Technology",
+        &[
+            "create",
+            "mekanism",
+            "appliedenergistics",
+            "refined-storage",
+            "immersive-engineering",
+            "ae2",
+        ],
+    ),
+    (
+        "magic",
+        "Magic",
+        &[
+            "botania",
+            "ars-nouveau",
+            "blood-magic",
+            "occultism",
+            "evilcraft",
+        ],
+    ),
+    (
+        "adventure",
+        "Adventure",
+        &[
+            "twilight-forest",
+            "aether",
+            "dungeons",
+            "better-dungeons",
+            "yungs",
+        ],
+    ),
+    (
+        "utility",
+        "Utility",
+        &[
+            "jei",
+            "rei",
+            "wthit",
+            "jade",
+            "emi",
+            "crafttweaker",
+            "kubejs",
+        ],
+    ),
+    (
+        "library",
+        "Library/API",
+        &[
+            "fabric-api",
+            "forge",
+            "cloth-config",
+            "architectury",
+            "fabric-language-kotlin",
+            "quilted-fabric-api",
+        ],
+    ),
+    (
+        "qol",
+        "Quality of Life",
+        &[
+            "appleskin",
+            "journeymap",
+            "minimap",
+            "inventory-hud",
+            "xaeros",
+            "mouse-tweaks",
+        ],
+    ),
+    (
+        "cosmetic",
+        "Cosmetic",
+        &[
+            "fresh-animations",
+            "entity-texture-features",
+            "continuity",
+            "lambdynamiclights",
+        ],
+    ),
 ];
 
 fn categorize_mod_id(mod_id: &str) -> ModCategory {
@@ -122,9 +222,7 @@ fn read_jar_metadata(path: &std::path::Path) -> Option<(String, Vec<String>, Vec
 }
 
 #[tauri::command]
-pub fn categorize_instance_mods(
-    instance_id: String,
-) -> Result<Vec<CategorizedMod>, String> {
+pub fn categorize_instance_mods(instance_id: String) -> Result<Vec<CategorizedMod>, String> {
     let mods_dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -141,14 +239,8 @@ pub fn categorize_instance_mods(
             continue;
         }
         let path = entry.path();
-        let (display_name, loaders, game_versions) =
-            read_jar_metadata(&path).unwrap_or_else(|| {
-                (
-                    name.trim_end_matches(".jar").to_string(),
-                    vec![],
-                    vec![],
-                )
-            });
+        let (display_name, loaders, game_versions) = read_jar_metadata(&path)
+            .unwrap_or_else(|| (name.trim_end_matches(".jar").to_string(), vec![], vec![]));
         let category = categorize_mod_id(&display_name.to_lowercase());
         result.push(CategorizedMod {
             mod_id: display_name.to_lowercase().replace(' ', "-"),
@@ -160,6 +252,10 @@ pub fn categorize_instance_mods(
             compatibility: "unknown".into(),
         });
     }
-    result.sort_by(|a, b| a.detected_category.category.cmp(&b.detected_category.category));
+    result.sort_by(|a, b| {
+        a.detected_category
+            .category
+            .cmp(&b.detected_category.category)
+    });
     Ok(result)
 }

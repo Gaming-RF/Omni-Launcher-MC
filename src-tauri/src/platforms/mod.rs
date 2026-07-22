@@ -1,8 +1,8 @@
 // Unified mod platform abstraction
 // Provides a common interface for Modrinth and CurseForge APIs
 
-pub mod modrinth_adapter;
 pub mod curseforge_adapter;
+pub mod modrinth_adapter;
 
 use serde::{Deserialize, Serialize};
 
@@ -144,7 +144,7 @@ impl SortOrder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedSearchRequest {
     pub query: String,
-    pub source: Option<ModSource>,       // None = search both
+    pub source: Option<ModSource>,           // None = search both
     pub resource_type: Option<ResourceType>, // None = all types
     pub game_version: Option<String>,
     pub loader: Option<String>,

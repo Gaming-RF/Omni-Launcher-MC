@@ -31,7 +31,13 @@ pub async fn create_desktop_shortcut(
 
     let safe_name = instance_name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>();
 
     #[cfg(target_os = "linux")]
@@ -82,8 +88,7 @@ Categories=Game;
     {
         let lnk_file = out_dir.join(format!("{}.lnk", instance_name));
         // On Windows we'd use a .lnk shortcut, but for simplicity create a .bat
-        let bat_file = out_dir
-            .join(format!("{}-OmniLauncher.bat", safe_name));
+        let bat_file = out_dir.join(format!("{}-OmniLauncher.bat", safe_name));
         let content = format!(
             "@echo off\r\nstart \"\" \"{exe}\" --instance {id}\r\n",
             exe = std::env::current_exe()

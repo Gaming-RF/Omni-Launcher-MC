@@ -57,9 +57,7 @@ pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, Stri
 
         let modified = metadata
             .modified()
-            .map(|t| {
-                chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
-            })
+            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339())
             .unwrap_or_default();
 
         files.push(LogFileInfo {
@@ -128,10 +126,7 @@ pub async fn read_log_cursor(
 
 /// Read the full content of a log file.
 #[tauri::command]
-pub async fn read_log_file(
-    instance_id: String,
-    filename: String,
-) -> Result<String, String> {
+pub async fn read_log_file(instance_id: String, filename: String) -> Result<String, String> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -149,10 +144,7 @@ pub async fn read_log_file(
 
 /// Delete a specific log file.
 #[tauri::command]
-pub async fn delete_log_file(
-    instance_id: String,
-    filename: String,
-) -> Result<(), String> {
+pub async fn delete_log_file(instance_id: String, filename: String) -> Result<(), String> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -201,10 +193,7 @@ pub async fn delete_all_logs(instance_id: String) -> Result<u32, String> {
 
 /// Get log file size.
 #[tauri::command]
-pub async fn get_log_size(
-    instance_id: String,
-    filename: String,
-) -> Result<u64, String> {
+pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, String> {
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
