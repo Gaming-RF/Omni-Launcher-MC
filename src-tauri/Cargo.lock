@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "omni-launcher-mc"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
