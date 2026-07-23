@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSettingsStore } from "../stores/settings";
-import { startLogin, pollLogin } from "../lib/tauri";
+import { startLogin, pollLogin, extractErrorMessage } from "../lib/tauri";
 import { useAuthStore } from "../stores/auth";
 import {
   User,
@@ -65,7 +65,7 @@ export function Settings() {
           setVerificationUri(null);
         } catch (err) {
           if (!mountedRef.current) return;
-          const msg = String(err);
+          const msg = extractErrorMessage(err);
           if (msg.includes("authorization_pending") || msg.includes("slow_down")) {
             setTimeout(poll, 5000);
           } else {
@@ -78,7 +78,7 @@ export function Settings() {
     } catch (err) {
       if (!mountedRef.current) return;
       setLoginStatus("error");
-      setLoginError(String(err));
+      setLoginError(extractErrorMessage(err));
     }
   }, [fetchAccounts]);
 

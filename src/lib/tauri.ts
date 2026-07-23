@@ -1,5 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 
+// ── Error handling ─────────────────────────────────────────────
+
+/** Extract error message from AppError object or plain string */
+export function extractErrorMessage(err: unknown): string {
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
+  return String(err);
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 
 export interface DeviceCodeInfo {
