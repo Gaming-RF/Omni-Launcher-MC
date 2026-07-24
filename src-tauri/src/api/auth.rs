@@ -232,6 +232,7 @@ pub async fn poll_for_token(device_code: &str) -> Result<(String, String)> {
     params.insert("client_id", CLIENT_ID);
     params.insert("grant_type", "urn:ietf:params:oauth:grant-type:device_code");
     params.insert("device_code", device_code);
+    params.insert("scope", SCOPE);
 
     let resp = client.post(TOKEN_URL).form(&params).send().await?;
     let status = resp.status();
@@ -280,6 +281,7 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .context("Failed to send Xbox Live request")?;
     let xbl_status = xbl_resp_raw.status();
     let xbl_text = xbl_resp_raw.text().await.unwrap_or_default();
+    log::debug!("Xbox Live response ({}): {}", xbl_status, &xbl_text[..xbl_text.len().min(500)]);
     if xbl_text.trim().is_empty() {
         anyhow::bail!(
             "Xbox Live returned {} with an empty body. This usually means the Microsoft token is \
