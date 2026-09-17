@@ -7,8 +7,8 @@
 //! Modrinth-sourced mods with valid hashes go into the `files` array in the index.
 //! CurseForge mods (or mods without computable hashes) are placed in `overrides/mods/`.
 
-use crate::error::AppError;
 use crate::db;
+use crate::error::AppError;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -279,7 +279,8 @@ fn build_mrpack_zip(
         }
     }
 
-    zip.finish().map_err(|e| AppError::Internal(e.to_string()))?;
+    zip.finish()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Use actual file size for accuracy.
     let final_size = std::fs::metadata(dest_path)
@@ -311,10 +312,12 @@ pub async fn export_mrpack(
     include_saves: bool,
 ) -> Result<MrpackExportResult, AppError> {
     let (instance, mods) = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        let instance = db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let instance =
+            db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
         let mods = db::mods::get_instance_mods(&db, &instance_id)?;
         (instance, mods)
     };
@@ -357,10 +360,12 @@ pub async fn export_mrpack_to_path(
     include_saves: bool,
 ) -> Result<MrpackExportResult, AppError> {
     let (instance, mods) = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        let instance = db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let instance =
+            db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
         let mods = db::mods::get_instance_mods(&db, &instance_id)?;
         (instance, mods)
     };

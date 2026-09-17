@@ -1,5 +1,5 @@
-use crate::error::AppError;
 use crate::db;
+use crate::error::AppError;
 use crate::AppState;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -66,7 +66,10 @@ pub async fn import_launcher_instance(
 ) -> Result<db::instances::GameInstance, AppError> {
     let source = PathBuf::from(&source_path);
     if !source.exists() {
-        return Err(AppError::Internal(format!("{}", "")));
+        return Err(AppError::NotFound(format!(
+            "Launcher instance path does not exist: {}",
+            source_path
+        )));
     }
 
     // Create the instance in our DB
@@ -98,7 +101,10 @@ pub async fn import_launcher_instance(
     };
 
     {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         db::instances::insert_instance(&db, &instance)?;
     }
 
@@ -106,9 +112,7 @@ pub async fn import_launcher_instance(
     let instance_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id);
-    tokio::fs::create_dir_all(&instance_dir)
-        .await
-        ?;
+    tokio::fs::create_dir_all(&instance_dir).await?;
 
     // Copy common directories
     let dirs_to_copy = ["mods", "saves", "resourcepacks", "shaderpacks", "config"];
@@ -116,9 +120,7 @@ pub async fn import_launcher_instance(
         let src_dir = source.join(dir_name);
         if src_dir.exists() {
             let dst_dir = instance_dir.join(dir_name);
-            copy_dir_recursive(&src_dir, &dst_dir)
-                .await
-                ?;
+            copy_dir_recursive(&src_dir, &dst_dir).await?;
         }
     }
 
@@ -128,9 +130,7 @@ pub async fn import_launcher_instance(
         let src_file = source.join(file_name);
         if src_file.exists() {
             let dst_file = instance_dir.join(file_name);
-            tokio::fs::copy(&src_file, &dst_file)
-                .await
-                ?;
+            tokio::fs::copy(&src_file, &dst_file).await?;
         }
     }
 
@@ -185,9 +185,7 @@ async fn scan_multimc(base: &std::path::Path) -> Result<Vec<ImportableInstance>,
     }
 
     let mut results = Vec::new();
-    let mut entries = tokio::fs::read_dir(&instances_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&instances_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let instance_cfg = entry.path().join("instance.cfg");
@@ -244,9 +242,7 @@ async fn scan_curseforge_app(base: &std::path::Path) -> Result<Vec<ImportableIns
     }
 
     let mut results = Vec::new();
-    let mut entries = tokio::fs::read_dir(&profiles_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&profiles_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let manifest = entry.path().join("manifest.json");
@@ -307,9 +303,7 @@ async fn scan_atlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
     }
 
     let mut results = Vec::new();
-    let mut entries = tokio::fs::read_dir(&instances_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&instances_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let instance_json = entry.path().join("instance.json");
@@ -360,9 +354,7 @@ async fn scan_gdlauncher(base: &std::path::Path) -> Result<Vec<ImportableInstanc
     }
 
     let mut results = Vec::new();
-    let mut entries = tokio::fs::read_dir(&instances_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&instances_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let config = entry.path().join("config.json");

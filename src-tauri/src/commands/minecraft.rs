@@ -1,4 +1,3 @@
-use crate::error::AppError;
 use crate::api::curseforge;
 use crate::api::loaders;
 use crate::api::minecraft;
@@ -6,6 +5,7 @@ use crate::api::modrinth;
 use crate::commands::instances::InstanceListItem;
 use crate::commands::loaders::ModVersionInfo;
 use crate::db;
+use crate::error::AppError;
 use crate::utils::launcher;
 use crate::utils::progress;
 use crate::AppState;
@@ -20,10 +20,10 @@ pub struct VersionEntry {
 }
 
 #[tauri::command]
-pub async fn get_version_manifest(state: State<'_, AppState>) -> Result<Vec<VersionEntry>, AppError> {
-    let manifest = minecraft::fetch_version_manifest(Some(&state.http))
-        .await
-        ?;
+pub async fn get_version_manifest(
+    state: State<'_, AppState>,
+) -> Result<Vec<VersionEntry>, AppError> {
+    let manifest = minecraft::fetch_version_manifest(Some(&state.http)).await?;
 
     Ok(manifest
         .versions
@@ -42,17 +42,21 @@ pub async fn prepare_instance(
     instance_id: String,
 ) -> Result<String, AppError> {
     let instance = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?
     };
 
     let task_id = format!("prepare-{}", instance_id);
 
     // Emit progress start
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -66,28 +70,29 @@ pub async fn prepare_instance(
     let base_dir = crate::utils::paths::data_dir();
 
     // Use ensure_java for auto-download
-    let java_path = crate::utils::java::ensure_java(&instance.game_version, None)
-        .await
-        ?;
+    let java_path = crate::utils::java::ensure_java(&instance.game_version, None).await?;
 
     let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Emit progress: downloading version JSON
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "version_json", "Downloading version JSON...");
         }
     }
 
-    game_launcher
-        .prepare(&instance)
-        .await
-        ?;
+    game_launcher.prepare(&instance).await?;
 
     // Emit completion
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::complete(app, &task_id, &format!("{} ready to play!", instance.name));
         }
@@ -102,7 +107,10 @@ pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Res
 
     // Emit progress: starting
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "starting", "Preparing to launch...");
         }
@@ -110,13 +118,14 @@ pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Res
 
     // Get instance and account
     let (instance, account) = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        let instance = db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let instance =
+            db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
 
-        let account = db::accounts::get_active_account(&db)
-            ?
+        let account = db::accounts::get_active_account(&db)?
             .ok_or("No account logged in. Please sign in first.")?;
 
         db::instances::record_play(&db, &instance_id)?;
@@ -128,34 +137,38 @@ pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Res
 
     // Auto-download Java if needed
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "java", "Checking Java...");
         }
     }
 
-    let java_path = crate::utils::java::ensure_java(&instance.game_version, None)
-        .await
-        ?;
+    let java_path = crate::utils::java::ensure_java(&instance.game_version, None).await?;
 
     let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Prepare (download assets if needed)
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "assets", "Downloading game files...");
         }
     }
 
-    game_launcher
-        .prepare(&instance)
-        .await
-        ?;
+    game_launcher.prepare(&instance).await?;
 
     // Launch
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "launching", "Starting Minecraft...");
         }
@@ -169,12 +182,14 @@ pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Res
             &account.uuid,
             false,
         )
-        .await
-        ?;
+        .await?;
 
     // Register the child process with the process manager
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             state.process_manager.spawn(app, &instance_id, child, pid);
         }
@@ -182,7 +197,10 @@ pub async fn launch_game(state: State<'_, AppState>, instance_id: String) -> Res
 
     // Emit completion
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::complete(app, &task_id, &format!("Minecraft launched (PID {})", pid));
         }
@@ -236,11 +254,11 @@ pub async fn modrinth_search(
 ) -> Result<Vec<ModSearchResult>, AppError> {
     let query = crate::utils::validate::sanitize_query(&query);
     if query.is_empty() {
-        return Err(AppError::Internal("Search query cannot be empty".to_string()));
+        return Err(AppError::Internal(
+            "Search query cannot be empty".to_string(),
+        ));
     }
-    let results = modrinth::search(&query, None, offset.unwrap_or(0), limit.unwrap_or(20))
-        .await
-        ?;
+    let results = modrinth::search(&query, None, offset.unwrap_or(0), limit.unwrap_or(20)).await?;
 
     Ok(results
         .hits
@@ -269,13 +287,17 @@ pub async fn curseforge_search(
 ) -> Result<Vec<ModSearchResult>, AppError> {
     let query = crate::utils::validate::sanitize_query(&query);
     if query.is_empty() {
-        return Err(AppError::Internal("Search query cannot be empty".to_string()));
+        return Err(AppError::Internal(
+            "Search query cannot be empty".to_string(),
+        ));
     }
 
     let api_key = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        db::settings::get_curseforge_api_key(&db)
-            ?
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        db::settings::get_curseforge_api_key(&db)?
             .ok_or("CurseForge API key not configured. Add it in Settings.")?
     };
 
@@ -287,8 +309,7 @@ pub async fn curseforge_search(
         offset.unwrap_or(0),
         limit.unwrap_or(20),
     )
-    .await
-    ?;
+    .await?;
 
     Ok(results
         .data
@@ -341,8 +362,7 @@ pub async fn search_modpacks_modrinth(
         offset.unwrap_or(0),
         limit.unwrap_or(20),
     )
-    .await
-    ?;
+    .await?;
 
     Ok(results
         .hits
@@ -372,9 +392,11 @@ pub async fn search_modpacks_curseforge(
     let query = crate::utils::validate::sanitize_query(&query);
 
     let api_key = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        db::settings::get_curseforge_api_key(&db)
-            ?
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        db::settings::get_curseforge_api_key(&db)?
             .ok_or("CurseForge API key not configured. Add it in Settings.")?
     };
 
@@ -393,11 +415,9 @@ pub async fn search_modpacks_curseforge(
         .header("x-api-key", &api_key)
         .header("Accept", "application/json")
         .send()
-        .await
-        ?
+        .await?
         .json()
-        .await
-        ?;
+        .await?;
 
     Ok(resp
         .data
@@ -440,9 +460,7 @@ pub async fn search_modpacks_curseforge(
 pub async fn get_modpack_versions_modrinth(
     project_id: String,
 ) -> Result<Vec<ModVersionInfo>, AppError> {
-    let versions = modrinth::get_project_versions(&project_id, None, None)
-        .await
-        ?;
+    let versions = modrinth::get_project_versions(&project_id, None, None).await?;
 
     Ok(versions
         .into_iter()
@@ -472,7 +490,10 @@ pub async fn download_and_install_modpack(
 
     // Emit progress: downloading
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -494,21 +515,16 @@ pub async fn download_and_install_modpack(
     };
     let temp_path = temp_dir.join(format!("{}{}", uuid::Uuid::new_v4(), ext));
 
-    let bytes = state
-        .http
-        .get(&download_url)
-        .send()
-        .await
-        ?
-        .bytes()
-        .await
-        ?;
+    let bytes = state.http.get(&download_url).send().await?.bytes().await?;
 
     std::fs::write(&temp_path, &bytes)?;
 
     // Emit progress: parsing
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "modpack", "Parsing modpack...");
         }
@@ -519,12 +535,14 @@ pub async fn download_and_install_modpack(
         crate::utils::modpack::parse_mrpack(&temp_path)
     } else {
         crate::utils::modpack::parse_cf_modpack(&temp_path)
-    }
-    ?;
+    }?;
 
     // Create instance
     let instance = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         let display_name = if name.len() > 60 { &name[..60] } else { &name };
         db::instances::create_instance(
             &db,
@@ -537,15 +555,17 @@ pub async fn download_and_install_modpack(
                 java_args: None,
                 allocated_memory_mb: 4096,
             },
-        )
-        ?
+        )?
     };
 
     let instance_dir = crate::utils::paths::instances_dir().join(&instance.id);
 
     // Emit progress: installing
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -558,21 +578,18 @@ pub async fn download_and_install_modpack(
 
     // Install modpack files
     if source == "modrinth" {
-        crate::utils::modpack::install_mrpack(&temp_path, &instance_dir, &state.http)
-            .await
-            ?;
+        crate::utils::modpack::install_mrpack(&temp_path, &instance_dir, &state.http).await?;
     } else {
         let (_info, cf_files) =
-            crate::utils::modpack::install_cf_modpack(&temp_path, &instance_dir)
-                .await
-                ?;
+            crate::utils::modpack::install_cf_modpack(&temp_path, &instance_dir).await?;
 
         // Download CurseForge mods via API
         let api_key = {
-            let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-            db::settings::get_curseforge_api_key(&db)
-                ?
-                .unwrap_or_default()
+            let db = state
+                .db
+                .lock()
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            db::settings::get_curseforge_api_key(&db)?.unwrap_or_default()
         };
 
         if !api_key.is_empty() {
@@ -593,7 +610,10 @@ pub async fn download_and_install_modpack(
 
     // Emit progress: installing loader
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -633,7 +653,10 @@ pub async fn download_and_install_modpack(
 
     // Emit completion
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::complete(app, &task_id, &format!("{} installed successfully!", name));
         }
@@ -672,15 +695,19 @@ pub fn list_installed_packs(
         "resourcepacks" | "shaderpacks" => crate::utils::paths::instances_dir()
             .join(&instance_id)
             .join(&pack_type),
-        _ => return Err(AppError::Internal(format!("Invalid pack type: {}", pack_type))),
+        _ => {
+            return Err(AppError::Internal(format!(
+                "Invalid pack type: {}",
+                pack_type
+            )))
+        }
     };
 
     if !dir.exists() {
         return Ok(Vec::new());
     }
 
-    let entries: Vec<InstalledPackInfo> = std::fs::read_dir(&dir)
-        ?
+    let entries: Vec<InstalledPackInfo> = std::fs::read_dir(&dir)?
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let name = entry.file_name().to_string_lossy().to_string();
@@ -710,7 +737,12 @@ pub fn toggle_pack(
         "resourcepacks" | "shaderpacks" => crate::utils::paths::instances_dir()
             .join(&instance_id)
             .join(&pack_type),
-        _ => return Err(AppError::Internal(format!("Invalid pack type: {}", pack_type))),
+        _ => {
+            return Err(AppError::Internal(format!(
+                "Invalid pack type: {}",
+                pack_type
+            )))
+        }
     };
 
     let current_path = dir.join(&file_name);
@@ -743,7 +775,12 @@ pub fn delete_pack(
             .join(&instance_id)
             .join(&pack_type)
             .join(&file_name),
-        _ => return Err(AppError::Internal(format!("Invalid pack type: {}", pack_type))),
+        _ => {
+            return Err(AppError::Internal(format!(
+                "Invalid pack type: {}",
+                pack_type
+            )))
+        }
     };
 
     if path.exists() {
@@ -785,7 +822,10 @@ pub async fn launch_game_offline(
 
     // Emit progress: starting
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -797,10 +837,11 @@ pub async fn launch_game_offline(
     }
 
     let instance = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        let inst = db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let inst = db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
 
         db::instances::record_play(&db, &instance_id)?;
 
@@ -811,34 +852,38 @@ pub async fn launch_game_offline(
 
     // Auto-download Java
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "java", "Checking Java...");
         }
     }
 
-    let java_path = crate::utils::java::ensure_java(&instance.game_version, None)
-        .await
-        ?;
+    let java_path = crate::utils::java::ensure_java(&instance.game_version, None).await?;
 
     let game_launcher = launcher::GameLauncher::new(base_dir, java_path, state.http.clone());
 
     // Prepare (download assets if needed)
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(app, &task_id, "assets", "Downloading game files...");
         }
     }
 
-    game_launcher
-        .prepare(&instance)
-        .await
-        ?;
+    game_launcher.prepare(&instance).await?;
 
     // Launch with offline credentials
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::phase_start(
                 app,
@@ -854,12 +899,14 @@ pub async fn launch_game_offline(
 
     let (pid, child) = game_launcher
         .launch(&instance, access_token, &username, &uuid, true)
-        .await
-        ?;
+        .await?;
 
     // Register with process manager
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             state.process_manager.spawn(app, &instance_id, child, pid);
         }
@@ -867,7 +914,10 @@ pub async fn launch_game_offline(
 
     // Emit completion
     {
-        let handle_guard = state.app_handle.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+        let handle_guard = state
+            .app_handle
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
         if let Some(app) = handle_guard.as_ref() {
             progress::complete(
                 app,
@@ -904,7 +954,9 @@ pub async fn aggregated_search(
 ) -> Result<Vec<AggregatedSearchResult>, AppError> {
     let query = crate::utils::validate::sanitize_query(&query);
     if query.is_empty() {
-        return Err(AppError::Internal("Search query cannot be empty".to_string()));
+        return Err(AppError::Internal(
+            "Search query cannot be empty".to_string(),
+        ));
     }
 
     let offset = offset.unwrap_or(0);
@@ -914,7 +966,10 @@ pub async fn aggregated_search(
     let modrinth_fut = modrinth::search(&query, None, offset, limit);
     let curseforge_fut = async {
         let api_key = {
-            let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+            let db = state
+                .db
+                .lock()
+                .map_err(|e| AppError::Internal(e.to_string()))?;
             db::settings::get_curseforge_api_key(&db)?
         };
         Ok::<_, AppError>(match api_key {

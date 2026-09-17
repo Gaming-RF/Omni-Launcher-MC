@@ -22,8 +22,7 @@ pub async fn get_modloader_matrix(
 ) -> Result<Vec<ModloaderMatrixEntry>, AppError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
-        .build()
-        ?;
+        .build()?;
 
     let (fabric, forge, quilt, neoforge) = tokio::join!(
         fetch_fabric(&client, &game_version),
@@ -70,10 +69,12 @@ pub async fn get_instance_modloader_matrix(
     instance_id: String,
 ) -> Result<Vec<ModloaderMatrixEntry>, AppError> {
     let (game_version, installed_loader, installed_loader_version) = {
-        let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-        let instance = crate::db::instances::get_instance(&db, &instance_id)
-            ?
-            .ok_or("Instance not found")?;
+        let db = state
+            .db
+            .lock()
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        let instance =
+            crate::db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
         (
             instance.game_version,
             instance.loader.clone(),
@@ -101,14 +102,7 @@ async fn fetch_fabric(
         "https://meta.fabricmc.net/v2/versions/loader/{}",
         game_version
     );
-    let resp: Vec<serde_json::Value> = client
-        .get(&url)
-        .send()
-        .await
-        ?
-        .json()
-        .await
-        ?;
+    let resp: Vec<serde_json::Value> = client.get(&url).send().await?.json().await?;
 
     let versions: Vec<LoaderVersionInfo> = resp
         .iter()
@@ -145,14 +139,7 @@ async fn fetch_forge(
 ) -> Result<ModloaderMatrixEntry, AppError> {
     // Forge versions from maven metadata
     let url = "https://files.minecraftforge.net/maven/net/minecraftforge/forge/maven-metadata.xml";
-    let body = client
-        .get(url)
-        .send()
-        .await
-        ?
-        .text()
-        .await
-        ?;
+    let body = client.get(url).send().await?.text().await?;
 
     // Parse versions that match our game version
     let prefix = format!("{}-", game_version);
@@ -194,14 +181,7 @@ async fn fetch_quilt(
         "https://meta.quiltmc.org/v3/versions/loader/{}",
         game_version
     );
-    let resp: Vec<serde_json::Value> = client
-        .get(&url)
-        .send()
-        .await
-        ?
-        .json()
-        .await
-        ?;
+    let resp: Vec<serde_json::Value> = client.get(&url).send().await?.json().await?;
 
     let versions: Vec<LoaderVersionInfo> = resp
         .iter()
@@ -236,14 +216,7 @@ async fn fetch_neoforge(
     game_version: &str,
 ) -> Result<ModloaderMatrixEntry, AppError> {
     let url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-    let body = client
-        .get(url)
-        .send()
-        .await
-        ?
-        .text()
-        .await
-        ?;
+    let body = client.get(url).send().await?.text().await?;
 
     // NeoForge versions are like 21.0.1-beta for MC 1.21
     let mc_major = game_version.split('.').nth(1).unwrap_or("21");

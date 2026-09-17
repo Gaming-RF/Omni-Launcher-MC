@@ -19,7 +19,9 @@ pub async fn upload_skin(
     // This requires Mojang API authentication
     // POST https://api.minecraftservices.com/minecraft/profile/skins
     // with multipart form data (file + variant)
-    Err(AppError::Internal("Skin upload requires Microsoft authentication. Please sign in first.".to_string()))
+    Err(AppError::Internal(
+        "Skin upload requires Microsoft authentication. Please sign in first.".to_string(),
+    ))
 }
 
 /// Get the current skin info for an account.
@@ -35,7 +37,10 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, AppError> {
     let resp = client.get(&url).send().await?;
 
     if !resp.status().is_success() {
-        return Err(AppError::Internal(format!("Failed to fetch profile: {}", resp.status())));
+        return Err(AppError::Internal(format!(
+            "Failed to fetch profile: {}",
+            resp.status()
+        )));
     }
 
     let body: serde_json::Value = resp.json().await?;
@@ -83,7 +88,9 @@ pub async fn get_skin_info(account_uuid: String) -> Result<SkinInfo, AppError> {
 #[tauri::command]
 pub async fn reset_skin(_account_uuid: String) -> Result<(), AppError> {
     // DELETE https://api.minecraftservices.com/minecraft/profile/skins
-    Err(AppError::Internal("Skin reset requires Microsoft authentication.".to_string()))
+    Err(AppError::Internal(
+        "Skin reset requires Microsoft authentication.".to_string(),
+    ))
 }
 
 /// Get available capes for an account.

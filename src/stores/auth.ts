@@ -11,6 +11,7 @@ interface AuthState {
   fetchAccounts: () => Promise<void>;
   removeAccount: (uuid: string) => Promise<void>;
   switchAccount: (uuid: string) => Promise<void>;
+  refreshAccount: (uuid: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -24,9 +25,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const accounts = await tauri.getAccounts();
+      const current = get().activeAccount;
+      const activeAccount =
+        accounts.find((account) => account.uuid === current?.uuid) ?? accounts[0] ?? null;
       set({
         accounts,
-        activeAccount: accounts[0] ?? null,
+        activeAccount,
         loading: false,
       });
     } catch (err) {
@@ -60,6 +64,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         accounts: reordered,
         activeAccount: account,
+      });
+    } catch (err) {
+      set({ error: String(err) });
+    }
+  },
+
+  refreshAccount: async (uuid: string) => {
+    try {
+      const account = await tauri.refreshAccountToken(uuid);
+      const { accounts, activeAccount } = get();
+      const updated = accounts.map((item) =>
+        item.uuid === account.uuid ? account : item
+      );
+      set({
+        accounts: updated,
+        activeAccount: activeAccount?.uuid === account.uuid ? account : activeAccount,
       });
     } catch (err) {
       set({ error: String(err) });

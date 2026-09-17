@@ -1,5 +1,5 @@
-use crate::error::AppError;
 use crate::db;
+use crate::error::AppError;
 use crate::AppState;
 use serde::Serialize;
 use tauri::State;
@@ -18,10 +18,11 @@ pub fn get_instance_hooks(
     state: State<'_, AppState>,
     instance_id: String,
 ) -> Result<InstanceHooks, AppError> {
-    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
-    let instance = db::instances::get_instance(&db, &instance_id)
-        ?
-        .ok_or("Instance not found")?;
+    let db = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let instance = db::instances::get_instance(&db, &instance_id)?.ok_or("Instance not found")?;
 
     Ok(InstanceHooks {
         pre_launch_cmd: instance.pre_launch_cmd,
@@ -37,7 +38,10 @@ pub fn update_instance_hooks(
     instance_id: String,
     hooks: InstanceHooks,
 ) -> Result<(), AppError> {
-    let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let db = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     db.execute(
         "UPDATE instances SET pre_launch_cmd = ?1, post_exit_cmd = ?2, hook_env_vars = ?3 WHERE id = ?4",
@@ -71,7 +75,11 @@ pub async fn execute_pre_launch(instance_id: &str, hooks: &InstanceHooks) -> Res
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(AppError::Internal(format!("{}", "")));
+            return Err(AppError::Internal(format!(
+                "Pre-launch hook exited with status {}: {}",
+                output.status,
+                stderr.trim()
+            )));
         }
     }
     Ok(())

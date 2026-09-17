@@ -151,7 +151,7 @@ src/
 ## What's Still Pending (by design)
 
 ### Requires Configuration
-- **Azure AD Client ID** — `CLIENT_ID` in `auth.rs` is `"YOUR_CLIENT_ID_HERE"`. Offline mode works without it.
+- **Microsoft sign-in** — Uses the bundled public client with browser OAuth PKCE and a validated loopback callback, plus device-code fallback. No client secret is required; offline mode remains available.
 - **CurseForge API key** — user sets via Settings. Required for CurseForge mod downloads in modpacks.
 - **Auto-updater signing keypair** — placeholder pubkey in `tauri.conf.json`. Generate real keypair for production releases.
 - **App icons** — currently solid emerald green placeholders. Need proper 32x32, 128x128, icon.ico, icon.png.

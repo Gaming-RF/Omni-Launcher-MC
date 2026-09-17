@@ -67,7 +67,55 @@ pub fn validate_path_within(base: &Path, target: &Path) -> Result<(), String> {
             base.display()
         ));
     }
+
     Ok(())
+}
+
+/// Validate a user-supplied single path component before joining it to a trusted directory.
+pub fn validate_relative_path_component(value: &str) -> Result<(), String> {
+    if value.is_empty() || value.len() > 255 {
+        return Err("Path component is empty or too long".to_string());
+    }
+    let path = Path::new(value);
+    if path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+        || value.contains('\0')
+        || value.contains('/')
+        || value.contains('\\')
+    {
+        return Err("Path traversal is not allowed".to_string());
+    }
+    Ok(())
+}
+
+/// Join an archive-relative path beneath a trusted base and reject lexical escapes.
+pub fn safe_join(base: &Path, relative: &str) -> Result<std::path::PathBuf, String> {
+    if relative.is_empty() {
+        return Err("Path cannot be empty".to_string());
+    }
+    let path = Path::new(relative);
+    if relative.contains('\0')
+        || relative.contains('\\')
+        || path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err("Path traversal is not allowed".to_string());
+    }
+    Ok(base.join(path))
 }
 
 /// Sanitize a search query — strip control characters and limit length.
@@ -104,5 +152,15 @@ mod tests {
     fn test_sanitize_query() {
         assert_eq!(sanitize_query("sodium\x00mod"), "sodiummod");
         assert_eq!(sanitize_query(&"a".repeat(300)).len(), 200);
+    }
+
+    #[test]
+    fn test_safe_paths_reject_traversal() {
+        assert!(validate_relative_path_component("latest.log").is_ok());
+        assert!(validate_relative_path_component("../secrets").is_err());
+        assert!(validate_relative_path_component(r"..\secrets").is_err());
+        assert!(safe_join(Path::new("/tmp/instance"), "mods/example.jar").is_ok());
+        assert!(safe_join(Path::new("/tmp/instance"), "../outside").is_err());
+        assert!(safe_join(Path::new("/tmp/instance"), r"..\outside").is_err());
     }
 }

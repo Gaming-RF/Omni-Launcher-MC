@@ -60,22 +60,15 @@ Categories=Game;
 "#
         );
 
-        tokio::fs::write(&desktop_file, content)
-            .await
-            ?;
+        tokio::fs::write(&desktop_file, content).await?;
 
         // Make executable
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = tokio::fs::metadata(&desktop_file)
-                .await
-                ?
-                .permissions();
+            let mut perms = tokio::fs::metadata(&desktop_file).await?.permissions();
             perms.set_mode(0o755);
-            tokio::fs::set_permissions(&desktop_file, perms)
-                .await
-                ?;
+            tokio::fs::set_permissions(&desktop_file, perms).await?;
         }
 
         return Ok(ShortcutResult {
@@ -98,9 +91,7 @@ Categories=Game;
             id = instance_id
         );
 
-        tokio::fs::write(&bat_file, content)
-            .await
-            ?;
+        tokio::fs::write(&bat_file, content).await?;
 
         return Ok(ShortcutResult {
             path: bat_file.to_string_lossy().to_string(),
@@ -120,21 +111,14 @@ Categories=Game;
             instance_id
         );
 
-        tokio::fs::write(&app_dir, &content)
-            .await
-            ?;
+        tokio::fs::write(&app_dir, &content).await?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = tokio::fs::metadata(&app_dir)
-                .await
-                ?
-                .permissions();
+            let mut perms = tokio::fs::metadata(&app_dir).await?.permissions();
             perms.set_mode(0o755);
-            tokio::fs::set_permissions(&app_dir, perms)
-                .await
-                ?;
+            tokio::fs::set_permissions(&app_dir, perms).await?;
         }
 
         return Ok(ShortcutResult {

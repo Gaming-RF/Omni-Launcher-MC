@@ -18,7 +18,10 @@ pub fn get_all_running_instances(
     let mut result = Vec::new();
     for id in ids {
         let name = {
-            let db = state.db.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+            let db = state
+                .db
+                .lock()
+                .map_err(|e| AppError::Internal(e.to_string()))?;
             crate::db::instances::get_instance(&db, &id)
                 .ok()
                 .flatten()
@@ -36,7 +39,10 @@ pub fn get_all_running_instances(
 
 #[tauri::command]
 pub fn terminate_instance(state: State<'_, AppState>, instance_id: String) -> Result<(), AppError> {
-    state.process_manager.kill(&instance_id).map_err(AppError::Internal)?;
+    state
+        .process_manager
+        .kill(&instance_id)
+        .map_err(AppError::Internal)?;
     Ok(())
 }
 

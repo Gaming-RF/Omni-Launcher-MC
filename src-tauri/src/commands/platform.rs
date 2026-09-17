@@ -54,9 +54,7 @@ pub async fn search_mods_unified(args: PlatformSearchArgs) -> Result<String, App
         limit: args.limit,
     };
 
-    let resp = platforms::search_unified(&req)
-        .await
-        ?;
+    let resp = platforms::search_unified(&req).await?;
 
     Ok(serde_json::to_string(&resp)?)
 }
@@ -81,24 +79,24 @@ pub async fn get_mod_versions_unified(
         game_version.as_deref(),
         loader.as_deref(),
     )
-    .await
-    ?;
+    .await?;
 
     Ok(serde_json::to_string(&versions)?)
 }
 
 /// Get project details from a specific source
 #[command]
-pub async fn get_mod_details_unified(source: String, project_id: String) -> Result<String, AppError> {
+pub async fn get_mod_details_unified(
+    source: String,
+    project_id: String,
+) -> Result<String, AppError> {
     let src = match source.as_str() {
         "modrinth" => ModSource::Modrinth,
         "curseforge" => ModSource::CurseForge,
         _ => return Err(AppError::Internal("Invalid source".to_string())),
     };
 
-    let details = platforms::get_project_details(&src, &project_id)
-        .await
-        ?;
+    let details = platforms::get_project_details(&src, &project_id).await?;
 
     Ok(serde_json::to_string(&details)?)
 }

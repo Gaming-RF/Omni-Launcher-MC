@@ -3,7 +3,8 @@
 ## ✅ Resolved
 - [x] Modrinth API client (implemented)
 - [x] CurseForge API client (implemented)
-- [x] Microsoft OAuth Device Code flow (implemented)
+- [x] Microsoft OAuth authorization-code flow with PKCE and validated loopback callback (implemented)
+- [x] Microsoft OAuth device-code fallback (implemented)
 - [x] Xbox/XSTS/Minecraft auth chain (implemented)
 - [x] Game launch orchestration (implemented)
 - [x] SQLite database schema & CRUD (implemented)
@@ -30,13 +31,12 @@ The CurseForge browsing feature requires an API key.
 Get one free at: https://console.curseforge.com/  
 Add it in Settings > CurseForge API Key.
 
-### 2. Microsoft Azure AD Client ID
-`src-tauri/src/api/auth.rs` has `CLIENT_ID = "YOUR_CLIENT_ID_HERE"`.  
-To enable Microsoft login you must register an Azure AD app:
-1. Go to https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
-2. Register a new app (Mobile and desktop application)
-3. Set redirect URI to `http://localhost` (not needed for device code flow)
-4. Copy the Application (client) ID into `auth.rs`
+### 2. Microsoft sign-in configuration
+Microsoft sign-in uses the bundled public client ID and does not require a
+client secret. The primary browser flow uses PKCE and a dynamically allocated
+`127.0.0.1` loopback callback. If a browser cannot complete the callback, use
+the device-code fallback in Settings. Never add a client secret or log access
+or refresh tokens.
 
 ## 🟡 System Requirements
 

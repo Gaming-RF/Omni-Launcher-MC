@@ -21,6 +21,7 @@ pub struct LogCursor {
 /// List all log files for an instance.
 #[tauri::command]
 pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let logs_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -31,9 +32,7 @@ pub async fn get_log_files(instance_id: String) -> Result<Vec<LogFileInfo>, AppE
     }
 
     let mut files = Vec::new();
-    let mut entries = tokio::fs::read_dir(&logs_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&logs_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
@@ -83,6 +82,9 @@ pub async fn read_log_cursor(
     cursor: u64,
     max_bytes: Option<u64>,
 ) -> Result<LogCursor, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -97,9 +99,7 @@ pub async fn read_log_cursor(
         });
     }
 
-    let data = tokio::fs::read(&log_path)
-        .await
-        ?;
+    let data = tokio::fs::read(&log_path).await?;
 
     let file_len = data.len() as u64;
     let max = max_bytes.unwrap_or(64 * 1024); // Default 64KB chunks
@@ -128,6 +128,9 @@ pub async fn read_log_cursor(
 /// Read the full content of a log file.
 #[tauri::command]
 pub async fn read_log_file(instance_id: String, filename: String) -> Result<String, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -144,6 +147,9 @@ pub async fn read_log_file(instance_id: String, filename: String) -> Result<Stri
 /// Delete a specific log file.
 #[tauri::command]
 pub async fn delete_log_file(instance_id: String, filename: String) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -154,9 +160,7 @@ pub async fn delete_log_file(instance_id: String, filename: String) -> Result<()
         return Err(AppError::Internal("Log file not found".to_string()));
     }
 
-    tokio::fs::remove_file(&log_path)
-        .await
-        ?;
+    tokio::fs::remove_file(&log_path).await?;
 
     Ok(())
 }
@@ -164,6 +168,7 @@ pub async fn delete_log_file(instance_id: String, filename: String) -> Result<()
 /// Delete all log files for an instance.
 #[tauri::command]
 pub async fn delete_all_logs(instance_id: String) -> Result<u32, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let logs_dir = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -174,15 +179,11 @@ pub async fn delete_all_logs(instance_id: String) -> Result<u32, AppError> {
     }
 
     let mut count = 0u32;
-    let mut entries = tokio::fs::read_dir(&logs_dir)
-        .await
-        ?;
+    let mut entries = tokio::fs::read_dir(&logs_dir).await?;
 
     while let Some(entry) = entries.next_entry().await? {
         if entry.path().is_file() {
-            tokio::fs::remove_file(entry.path())
-                .await
-                ?;
+            tokio::fs::remove_file(entry.path()).await?;
             count += 1;
         }
     }
@@ -193,6 +194,9 @@ pub async fn delete_all_logs(instance_id: String) -> Result<u32, AppError> {
 /// Get log file size.
 #[tauri::command]
 pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let log_path = crate::utils::paths::data_dir()
         .join("instances")
         .join(&instance_id)
@@ -203,9 +207,7 @@ pub async fn get_log_size(instance_id: String, filename: String) -> Result<u64, 
         return Ok(0);
     }
 
-    let metadata = tokio::fs::metadata(&log_path)
-        .await
-        ?;
+    let metadata = tokio::fs::metadata(&log_path).await?;
 
     Ok(metadata.len())
 }

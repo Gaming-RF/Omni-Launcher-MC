@@ -7,7 +7,14 @@ export function extractErrorMessage(err: unknown): string {
   if (typeof err === "object" && err !== null && "message" in err) {
     return String((err as { message: unknown }).message);
   }
-  return String(err);
+  const text = String(err);
+  try {
+    const parsed = JSON.parse(text) as { message?: unknown };
+    if (parsed && typeof parsed.message === "string") return parsed.message;
+  } catch {
+    // Tauri may return a plain string rather than structured JSON.
+  }
+  return text;
 }
 
 // ── Auth ──────────────────────────────────────────────────────
@@ -16,6 +23,13 @@ export interface DeviceCodeInfo {
   user_code: string;
   verification_uri: string;
   message: string;
+  interval: number;
+  expires_in: number;
+}
+
+export interface BrowserLoginInfo {
+  authorization_url: string;
+  redirect_uri: string;
 }
 
 export interface AccountInfo {
@@ -24,12 +38,24 @@ export interface AccountInfo {
   skin_url: string | null;
 }
 
-export async function startLogin(): Promise<DeviceCodeInfo> {
+export async function startLogin(): Promise<BrowserLoginInfo> {
   return invoke("start_login");
 }
 
 export async function pollLogin(): Promise<AccountInfo> {
   return invoke("poll_login");
+}
+
+export async function cancelLogin(): Promise<void> {
+  return invoke("cancel_login");
+}
+
+export async function startDeviceLogin(): Promise<DeviceCodeInfo> {
+  return invoke("start_device_login");
+}
+
+export async function pollDeviceLogin(): Promise<AccountInfo> {
+  return invoke("poll_device_login");
 }
 
 export async function getAccounts(): Promise<AccountInfo[]> {
@@ -42,6 +68,10 @@ export async function removeAccount(uuid: string): Promise<void> {
 
 export async function switchActiveAccount(uuid: string): Promise<AccountInfo> {
   return invoke("switch_active_account", { uuid });
+}
+
+export async function refreshAccountToken(uuid: string): Promise<AccountInfo> {
+  return invoke("refresh_account_token", { uuid });
 }
 
 // ── Instances ─────────────────────────────────────────────────
@@ -1199,4 +1229,3 @@ export async function terminateInstance(instanceId: string): Promise<void> {
 export async function terminateAllInstances(): Promise<number> {
   return invoke("terminate_all_instances");
 }
-

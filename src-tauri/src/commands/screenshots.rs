@@ -24,6 +24,7 @@ fn parse_date_from_filename(name: &str) -> String {
 
 #[tauri::command]
 pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -54,13 +55,19 @@ pub fn list_screenshots(instance_id: String) -> Result<Vec<ScreenshotInfo>, AppE
 
 #[tauri::command]
 pub fn delete_screenshot(instance_id: String, filename: String) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let path = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("screenshots")
         .join(&filename);
     if !path.exists() {
-        return Err(AppError::Internal(format!("{}", "")));
+        return Err(AppError::NotFound(format!(
+            "Screenshot does not exist: {}",
+            filename
+        )));
     }
     fs::remove_file(&path).map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(())
@@ -68,6 +75,7 @@ pub fn delete_screenshot(instance_id: String, filename: String) -> Result<(), Ap
 
 #[tauri::command]
 pub fn open_screenshots_folder(instance_id: String) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -83,13 +91,19 @@ pub fn export_screenshot(
     filename: String,
     dest_path: String,
 ) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
+    crate::utils::validate::validate_relative_path_component(&filename)
+        .map_err(AppError::Validation)?;
     let src = data_dir()
         .join("instances")
         .join(&instance_id)
         .join("screenshots")
         .join(&filename);
     if !src.exists() {
-        return Err(AppError::Internal(format!("{}", "")));
+        return Err(AppError::NotFound(format!(
+            "Screenshot does not exist: {}",
+            filename
+        )));
     }
     fs::copy(&src, &dest_path)?;
     Ok(())

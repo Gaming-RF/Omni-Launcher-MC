@@ -58,14 +58,21 @@ pub fn get_active_account(db: &rusqlite::Connection) -> Result<Option<Account>> 
 /// Insert or replace an account.
 pub fn upsert_account(db: &rusqlite::Connection, account: &Account) -> Result<()> {
     db.execute(
-        "INSERT OR REPLACE INTO accounts (uuid, username, access_token, refresh_token, skin_url) 
-         VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO accounts (uuid, username, access_token, refresh_token, skin_url, last_used)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(uuid) DO UPDATE SET
+           username = excluded.username,
+           access_token = excluded.access_token,
+           refresh_token = excluded.refresh_token,
+           skin_url = excluded.skin_url,
+           last_used = excluded.last_used",
         rusqlite::params![
             account.uuid,
             account.username,
             account.access_token,
             account.refresh_token,
             account.skin_url,
+            chrono::Utc::now().to_rfc3339(),
         ],
     )?;
     Ok(())

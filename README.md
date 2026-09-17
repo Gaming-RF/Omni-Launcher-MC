@@ -23,6 +23,7 @@ Most Minecraft launchers lock you into a single mod platform. OmniLauncherMC let
 - **Multi-source mod management** — Install mods from Modrinth and CurseForge into the same instance
 - **All mod loaders** — Fabric, Quilt, Forge, NeoForge, and Vanilla
 - **Offline mode** — Play without a Microsoft account (just enter a username)
+- **Microsoft sign-in** — Browser OAuth with PKCE and a loopback callback, plus device-code fallback
 - **Modpack support** — Import `.mrpack` (Modrinth) and CurseForge modpack zips
 - **Instance management** — Create, edit, duplicate, import/export, search/filter/sort
 - **Java auto-download** — Automatically downloads the right Java version for your MC version
@@ -127,11 +128,13 @@ To browse and install CurseForge mods, you need a free API key:
 
 ### Microsoft Account (Optional)
 
-For online multiplayer, register an Azure AD app:
-1. Go to https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps
-2. Register a new app (Personal Microsoft accounts only)
-3. Enable "Allow public client flows"
-4. Copy the Client ID into Settings
+Online sign-in uses Microsoft's public client flow: OmniLauncherMC opens the
+Microsoft authorization page in your browser, uses authorization-code PKCE, and
+accepts the response only on a validated loopback callback. No client secret is
+stored or required. If the browser callback cannot be used, Settings provides a
+device-code fallback. Existing accounts keep their refresh tokens and can be
+switched or refreshed independently. Offline mode remains available without a
+Microsoft account.
 
 ## Contributing
 

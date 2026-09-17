@@ -23,9 +23,7 @@ pub async fn ensure_java_for_mc(
     mc_version: String,
     custom_path: Option<String>,
 ) -> Result<JavaCheckResult, AppError> {
-    let path = java::ensure_java(&mc_version, custom_path.as_deref())
-        .await
-        ?;
+    let path = java::ensure_java(&mc_version, custom_path.as_deref()).await?;
 
     let major = java::java_version_for_mc(&mc_version);
     let auto_downloaded = java::is_java_installed(major)
@@ -44,8 +42,6 @@ pub async fn ensure_java_for_mc(
 /// Download a specific Java version (explicit user action).
 #[tauri::command]
 pub async fn download_java_version(java_major: u32) -> Result<String, AppError> {
-    let path = java::download_java(java_major)
-        .await
-        ?;
+    let path = java::download_java(java_major).await?;
     Ok(path.to_string_lossy().to_string())
 }

@@ -13,6 +13,8 @@ pub mod utils;
 /// Application state shared across commands via Tauri managed state.
 pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
+    /// A single in-flight browser OAuth request.
+    pub auth: tokio::sync::Mutex<Option<commands::auth::PendingBrowserLogin>>,
     /// Shared HTTP client with connection pooling.
     pub http: reqwest::Client,
     /// App handle for emitting events (progress, notifications).
@@ -59,6 +61,7 @@ pub fn run() {
             // Store connection in managed state
             app.manage(AppState {
                 db: Mutex::new(conn),
+                auth: tokio::sync::Mutex::new(None),
                 http: http_client,
                 app_handle: Mutex::new(Some(app.handle().clone())),
                 process_manager: utils::process_manager::ProcessManager::new(),
@@ -71,6 +74,9 @@ pub fn run() {
             // Auth commands
             commands::auth::start_login,
             commands::auth::poll_login,
+            commands::auth::cancel_login,
+            commands::auth::start_device_login,
+            commands::auth::poll_device_login,
             commands::auth::get_accounts,
             commands::auth::remove_account,
             commands::auth::switch_active_account,

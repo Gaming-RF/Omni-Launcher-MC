@@ -169,8 +169,8 @@ pub fn import_to_library(instance_id: String, file_name: String) -> Result<Libra
         "added_at": chrono::Utc::now().to_rfc3339(),
         "source": "manual",
     });
-    let meta_json =
-        serde_json::to_string_pretty(&meta).map_err(|e| format!("Failed to serialize metadata: {e}"))?;
+    let meta_json = serde_json::to_string_pretty(&meta)
+        .map_err(|e| format!("Failed to serialize metadata: {e}"))?;
     fs::write(lib_dir.join("meta.json"), meta_json).ok();
 
     // Replace original with symlink
@@ -203,8 +203,7 @@ pub fn link_library_to_instance(
     item_type: String,
 ) -> Result<(), AppError> {
     let lib_dir = library_dir().join(&item_type).join(&library_id);
-    let file = fs::read_dir(&lib_dir)
-        ?
+    let file = fs::read_dir(&lib_dir)?
         .flatten()
         .find(|e| e.file_name() != "meta.json")
         .ok_or("No file in library item")?;

@@ -87,6 +87,8 @@ fn read_zip_description(path: &PathBuf) -> Result<Option<String>, Box<dyn std::e
 }
 
 fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), AppError> {
+    crate::utils::validate::validate_relative_path_component(filename)
+        .map_err(AppError::Validation)?;
     let old_path = dir.join(filename);
     if !old_path.exists() {
         // Try finding with/without underscore prefix
@@ -120,6 +122,8 @@ fn toggle_pack_impl(dir: PathBuf, filename: &str, enabled: bool) -> Result<(), A
 }
 
 fn delete_pack_impl(dir: PathBuf, filename: &str) -> Result<(), AppError> {
+    crate::utils::validate::validate_relative_path_component(filename)
+        .map_err(AppError::Validation)?;
     let path = dir.join(filename);
     if !path.exists() {
         return Err(AppError::Internal(format!("File not found: {}", filename)));
@@ -134,6 +138,7 @@ fn delete_pack_impl(dir: PathBuf, filename: &str) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn list_resource_packs(instance_id: String) -> Result<Vec<ResourcePackInfo>, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -143,6 +148,7 @@ pub fn list_resource_packs(instance_id: String) -> Result<Vec<ResourcePackInfo>,
 
 #[tauri::command]
 pub fn list_shaders(instance_id: String) -> Result<Vec<ResourcePackInfo>, AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -156,6 +162,7 @@ pub fn toggle_resource_pack(
     filename: String,
     enabled: bool,
 ) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -165,6 +172,7 @@ pub fn toggle_resource_pack(
 
 #[tauri::command]
 pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -174,6 +182,7 @@ pub fn toggle_shader(instance_id: String, filename: String, enabled: bool) -> Re
 
 #[tauri::command]
 pub fn delete_resource_pack(instance_id: String, filename: String) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)
@@ -183,6 +192,7 @@ pub fn delete_resource_pack(instance_id: String, filename: String) -> Result<(),
 
 #[tauri::command]
 pub fn delete_shader(instance_id: String, filename: String) -> Result<(), AppError> {
+    crate::utils::validate::validate_id(&instance_id).map_err(AppError::Validation)?;
     let dir = data_dir()
         .join("instances")
         .join(&instance_id)

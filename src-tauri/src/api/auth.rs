@@ -1,12 +1,15 @@
 use anyhow::{Context, Result};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
+use tokio::time::timeout;
+use url::Url;
 
 // Microsoft OAuth2 - registered by PrismLauncher community
 // This is a public client (no secret needed) registered on Microsoft Identity Platform
 const CLIENT_ID: &str = "c36a9fb6-4f2a-41ff-90bd-ae7cc92031eb";
-const REDIRECT_URI: &str = "http://localhost:12749/auth/callback";
-
 // Microsoft endpoints (consumers tenant = personal accounts only)
 const AUTHORIZE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize";
 const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
@@ -24,7 +27,7 @@ const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profil
 pub struct AuthCodeState {
     pub code_verifier: String,
     pub state: String,
-    pub port: u16,
+    pub redirect_uri: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -83,45 +86,173 @@ fn sha256(data: &[u8]) -> Vec<u8> {
 
 /// Start the OAuth2 auth code flow with PKCE.
 /// Returns the authorization URL to open in the browser and the state needed for the callback.
-pub fn start_auth_code_flow() -> Result<(String, AuthCodeState)> {
+pub fn start_auth_code_flow(port: u16) -> Result<(String, AuthCodeState)> {
     let code_verifier = random_string(64);
     let state = random_string(32);
+    let redirect_uri = format!("http://127.0.0.1:{port}/auth/callback");
 
     // PKCE challenge = base64url(sha256(verifier))
     let challenge =
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sha256(code_verifier.as_bytes()));
 
-    let auth_url = format!(
-        "{}?client_id={}&response_type=code&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256&response_mode=query",
-        AUTHORIZE_URL,
-        CLIENT_ID,
-        urlencoding::encode(REDIRECT_URI),
-        urlencoding::encode(SCOPE),
-        state,
-        challenge,
-    );
-
-    // Parse port from redirect URI
-    let port = 12749u16;
+    let mut query = url::form_urlencoded::Serializer::new(String::new());
+    query.append_pair("client_id", CLIENT_ID);
+    query.append_pair("response_type", "code");
+    query.append_pair("redirect_uri", &redirect_uri);
+    query.append_pair("scope", SCOPE);
+    query.append_pair("state", &state);
+    query.append_pair("code_challenge", &challenge);
+    query.append_pair("code_challenge_method", "S256");
+    query.append_pair("response_mode", "query");
+    let auth_url = format!("{AUTHORIZE_URL}?{}", query.finish());
 
     Ok((
         auth_url,
         AuthCodeState {
             code_verifier,
             state,
-            port,
+            redirect_uri,
         },
     ))
 }
 
+struct CallbackRequest {
+    state: String,
+    code: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+fn parse_callback_target(target: &str) -> Result<CallbackRequest, String> {
+    let url = Url::parse(&format!("http://127.0.0.1{target}"))
+        .map_err(|_| "Invalid callback request".to_string())?;
+    if url.path() != "/auth/callback" {
+        return Err("Invalid callback path".to_string());
+    }
+
+    let mut state = None;
+    let mut code = None;
+    let mut error = None;
+    let mut error_description = None;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "state" => state = Some(value.into_owned()),
+            "code" => code = Some(value.into_owned()),
+            "error" => error = Some(value.into_owned()),
+            "error_description" => error_description = Some(value.into_owned()),
+            _ => {}
+        }
+    }
+
+    Ok(CallbackRequest {
+        state: state.ok_or_else(|| "Missing callback state".to_string())?,
+        code,
+        error,
+        error_description,
+    })
+}
+
+async fn callback_response(mut stream: tokio::net::TcpStream, status: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\n\
+         Content-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.shutdown().await;
+}
+
+/// Wait for a validated OAuth callback on a loopback listener.
+pub async fn listen_for_auth_callback(
+    listener: TcpListener,
+    expected_state: &str,
+) -> Result<String, String> {
+    timeout(Duration::from_secs(300), async {
+        loop {
+            let (mut stream, peer) = listener
+                .accept()
+                .await
+                .map_err(|_| "Unable to accept OAuth callback".to_string())?;
+            if !peer.ip().is_loopback() {
+                callback_response(stream, "403 Forbidden", "This callback is local only.").await;
+                continue;
+            }
+
+            let mut request = [0u8; 8192];
+            let size = stream
+                .read(&mut request)
+                .await
+                .map_err(|_| "Unable to read OAuth callback".to_string())?;
+            let request_line = std::str::from_utf8(&request[..size])
+                .ok()
+                .and_then(|request| request.lines().next())
+                .unwrap_or_default();
+            let target = request_line
+                .strip_prefix("GET ")
+                .and_then(|request| request.split_once(" HTTP/").map(|(target, _)| target));
+
+            let Some(target) = target else {
+                callback_response(stream, "400 Bad Request", "Invalid OAuth callback.").await;
+                continue;
+            };
+            let parsed = match parse_callback_target(target) {
+                Ok(parsed) => parsed,
+                Err(_) => {
+                    callback_response(stream, "400 Bad Request", "Invalid OAuth callback.").await;
+                    continue;
+                }
+            };
+            if parsed.state != expected_state {
+                callback_response(stream, "400 Bad Request", "Invalid OAuth callback state.").await;
+                continue;
+            }
+
+            if let Some(error) = parsed.error {
+                callback_response(
+                    stream,
+                    "400 Bad Request",
+                    "Microsoft sign-in was cancelled or denied. You can close this window.",
+                )
+                .await;
+                return Err(format!(
+                    "Microsoft sign-in failed: {error}{}",
+                    parsed
+                        .error_description
+                        .map(|description| format!(" ({description})"))
+                        .unwrap_or_default()
+                ));
+            }
+
+            let Some(code) = parsed.code else {
+                callback_response(stream, "400 Bad Request", "Missing authorization code.").await;
+                return Err("Microsoft callback did not contain an authorization code".to_string());
+            };
+            callback_response(
+                stream,
+                "200 OK",
+                "Microsoft sign-in complete. You can return to OmniLauncherMC.",
+            )
+            .await;
+            return Ok(code);
+        }
+    })
+    .await
+    .map_err(|_| "Microsoft sign-in timed out. Please try again.".to_string())?
+}
+
 /// Exchange an authorization code for tokens.
-pub async fn exchange_code(code: &str, code_verifier: &str) -> Result<(String, String)> {
+pub async fn exchange_code(
+    code: &str,
+    code_verifier: &str,
+    redirect_uri: &str,
+) -> Result<(String, String)> {
     let client = reqwest::Client::new();
 
     let mut params = std::collections::HashMap::new();
     params.insert("client_id", CLIENT_ID);
     params.insert("code", code);
-    params.insert("redirect_uri", REDIRECT_URI);
+    params.insert("redirect_uri", redirect_uri);
     params.insert("grant_type", "authorization_code");
     params.insert("code_verifier", code_verifier);
 
@@ -130,7 +261,7 @@ pub async fn exchange_code(code: &str, code_verifier: &str) -> Result<(String, S
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
     let token_resp: TokenResponse = serde_json::from_str(&body_text)
-        .map_err(|e| anyhow::anyhow!("Failed to decode token response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("Failed to decode token response ({status}): {e}"))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!(
@@ -163,7 +294,7 @@ pub async fn refresh_msa_token(refresh_token: &str) -> Result<(String, String)> 
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
     let token_resp: TokenResponse = serde_json::from_str(&body_text)
-        .map_err(|e| anyhow::anyhow!("Failed to decode refresh response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("Failed to decode refresh response ({status}): {e}"))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!("Refresh error: {}", error);
@@ -211,15 +342,35 @@ pub async fn start_device_code_flow() -> Result<DeviceCodeResponse> {
     }
 
     Ok(DeviceCodeResponse {
-        device_code: body["device_code"].as_str().unwrap_or_default().to_string(),
-        user_code: body["user_code"].as_str().unwrap_or_default().to_string(),
-        verification_uri: body["verification_uri"]
-            .as_str()
+        device_code: body
+            .get("device_code")
+            .and_then(|value| value.as_str())
+            .context("Device code response did not include a device code")?
+            .to_string(),
+        user_code: body
+            .get("user_code")
+            .and_then(|value| value.as_str())
+            .context("Device code response did not include a user code")?
+            .to_string(),
+        verification_uri: body
+            .get("verification_uri")
+            .or_else(|| body.get("verification_uri_complete"))
+            .and_then(|value| value.as_str())
+            .context("Device code response did not include a verification URI")?
+            .to_string(),
+        expires_in: body
+            .get("expires_in")
+            .and_then(|value| value.as_u64())
+            .context("Device code response did not include an expiry")? as u32,
+        interval: body
+            .get("interval")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(5) as u32,
+        message: body
+            .get("message")
+            .and_then(|value| value.as_str())
             .unwrap_or_default()
             .to_string(),
-        expires_in: body["expires_in"].as_u64().unwrap_or(900) as u32,
-        interval: body["interval"].as_u64().unwrap_or(5) as u32,
-        message: body["message"].as_str().unwrap_or_default().to_string(),
     })
 }
 
@@ -238,7 +389,7 @@ pub async fn poll_for_token(device_code: &str) -> Result<(String, String)> {
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
     let token_resp: TokenResponse = serde_json::from_str(&body_text)
-        .map_err(|e| anyhow::anyhow!("Failed to decode poll response ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("Failed to decode poll response ({status}): {e}"))?;
 
     if let Some(error) = &token_resp.error {
         anyhow::bail!(error.clone());
@@ -281,7 +432,6 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         .context("Failed to send Xbox Live request")?;
     let xbl_status = xbl_resp_raw.status();
     let xbl_text = xbl_resp_raw.text().await.unwrap_or_default();
-    log::debug!("Xbox Live response ({}): {}", xbl_status, &xbl_text[..xbl_text.len().min(500)]);
     if xbl_text.trim().is_empty() {
         anyhow::bail!(
             "Xbox Live returned {} with an empty body. This usually means the Microsoft token is \
@@ -290,7 +440,7 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         );
     }
     let xbl_resp: serde_json::Value = serde_json::from_str(&xbl_text)
-        .map_err(|e| anyhow::anyhow!("Xbox Live decode error ({}): {} — body: {}", xbl_status, e, &xbl_text[..xbl_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("Xbox Live decode error ({xbl_status}): {e}"))?;
 
     if let Some(err) = xbl_resp.get("error") {
         let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(0);
@@ -329,7 +479,7 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         anyhow::bail!("XSTS returned {} with an empty body.", xsts_status);
     }
     let xsts_resp: serde_json::Value = serde_json::from_str(&xsts_text)
-        .map_err(|e| anyhow::anyhow!("XSTS decode error ({}): {} — body: {}", xsts_status, e, &xsts_text[..xsts_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("XSTS decode error ({xsts_status}): {e}"))?;
 
     if let Some(err_code) = xsts_resp["XErr"].as_i64() {
         if err_code != 0 {
@@ -369,7 +519,7 @@ pub async fn xbox_auth_chain(msa_token: &str) -> Result<(String, String)> {
         anyhow::bail!("MC auth returned {} with an empty body.", mc_status);
     }
     let mc_resp: serde_json::Value = serde_json::from_str(&mc_text)
-        .map_err(|e| anyhow::anyhow!("MC auth decode error ({}): {} — body: {}", mc_status, e, &mc_text[..mc_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("MC auth decode error ({mc_status}): {e}"))?;
 
     let mc_token = mc_resp["access_token"]
         .as_str()
@@ -392,10 +542,41 @@ pub async fn get_minecraft_profile(mc_token: &str) -> Result<MinecraftProfile> {
     let body_text = resp.text().await.unwrap_or_default();
 
     if !status.is_success() {
-        anyhow::bail!("Profile fetch failed ({}): {}", status, body_text);
+        anyhow::bail!("Profile fetch failed ({status})");
     }
 
     let profile: MinecraftProfile = serde_json::from_str(&body_text)
-        .map_err(|e| anyhow::anyhow!("Profile decode error ({}): {} — body: {}", status, e, &body_text[..body_text.len().min(500)]))?;
+        .map_err(|e| anyhow::anyhow!("Profile decode error ({status}): {e}"))?;
     Ok(profile)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auth_url_uses_loopback_and_pkce() {
+        let (url, state) = start_auth_code_flow(45678).expect("auth flow");
+        let parsed = Url::parse(&url).expect("authorization URL");
+        let query: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
+        assert_eq!(query.get("redirect_uri"), Some(&state.redirect_uri));
+        assert_eq!(query.get("state"), Some(&state.state));
+        assert_eq!(
+            query.get("code_challenge_method"),
+            Some(&"S256".to_string())
+        );
+        assert!(state.redirect_uri.starts_with("http://127.0.0.1:45678/"));
+        assert_ne!(query.get("code_challenge"), Some(&state.code_verifier));
+    }
+
+    #[test]
+    fn callback_parser_requires_expected_shape() {
+        let callback =
+            parse_callback_target("/auth/callback?code=abc%2B123&state=expected&ignored=value")
+                .expect("callback");
+        assert_eq!(callback.state, "expected");
+        assert_eq!(callback.code.as_deref(), Some("abc+123"));
+        assert!(parse_callback_target("/other?code=abc&state=expected").is_err());
+        assert!(parse_callback_target("/auth/callback?code=abc").is_err());
+    }
 }

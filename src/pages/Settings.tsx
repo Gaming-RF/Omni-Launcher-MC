@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSettingsStore } from "../stores/settings";
-import { startLogin, pollLogin, extractErrorMessage } from "../lib/tauri";
+import {
+  startLogin,
+  pollLogin,
+  cancelLogin,
+  startDeviceLogin,
+  pollDeviceLogin,
+  extractErrorMessage,
+} from "../lib/tauri";
 import { useAuthStore } from "../stores/auth";
 import {
   User,
@@ -30,12 +37,16 @@ export function Settings() {
   const removeAccount = useAuthStore((s) => s.removeAccount);
   const locale = useI18nStore((s) => s.locale);
   const setLocale = useI18nStore((s) => s.setLocale);
+  const t = useI18nStore((s) => s.t);
 
   const [userCode, setUserCode] = useState<string | null>(null);
   const [verificationUri, setVerificationUri] = useState<string | null>(null);
+  const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
+  const [loginMethod, setLoginMethod] = useState<"browser" | "device" | null>(null);
   const [loginStatus, setLoginStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [loginError, setLoginError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const cancelRequestedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -44,43 +55,80 @@ export function Settings() {
     };
   }, []);
 
-  const handleLogin = useCallback(async () => {
+  const finishLogin = useCallback(async () => {
+    await fetchAccounts();
+    if (!mountedRef.current) return;
+    setLoginStatus("success");
+    setLoginMethod(null);
+    setUserCode(null);
+    setVerificationUri(null);
+    setAuthorizationUrl(null);
+  }, [fetchAccounts]);
+
+  const handleBrowserLogin = useCallback(async () => {
+    cancelRequestedRef.current = false;
     setLoginStatus("pending");
+    setLoginMethod("browser");
     setLoginError(null);
+    setAuthorizationUrl(null);
     try {
       const response = await startLogin();
+      if (!mountedRef.current) return;
+      setAuthorizationUrl(response.authorization_url);
+      await pollLogin();
+      await finishLogin();
+    } catch (err) {
+      if (!mountedRef.current || cancelRequestedRef.current) return;
+      setLoginStatus("error");
+      setLoginError(extractErrorMessage(err));
+    }
+  }, [finishLogin]);
+
+  const handleDeviceLogin = useCallback(async () => {
+    cancelRequestedRef.current = false;
+    setLoginStatus("pending");
+    setLoginMethod("device");
+    setLoginError(null);
+    try {
+      const response = await startDeviceLogin();
       if (!mountedRef.current) return;
       setUserCode(response.user_code);
       setVerificationUri(response.verification_uri);
 
-      // Start polling with unmount-safe scheduling
-      const poll = async () => {
-        if (!mountedRef.current) return;
+      const deadline = Date.now() + response.expires_in * 1000;
+      let interval = response.interval;
+      while (mountedRef.current && Date.now() < deadline) {
         try {
-          await pollLogin();
-          if (!mountedRef.current) return;
-          fetchAccounts();
-          setLoginStatus("success");
-          setUserCode(null);
-          setVerificationUri(null);
+          await pollDeviceLogin();
+          await finishLogin();
+          return;
         } catch (err) {
-          if (!mountedRef.current) return;
           const msg = extractErrorMessage(err);
-          if (msg.includes("authorization_pending") || msg.includes("slow_down")) {
-            setTimeout(poll, 5000);
-          } else {
-            setLoginStatus("error");
-            setLoginError(msg);
+          if (!msg.includes("authorization_pending") && !msg.includes("slow_down")) {
+            throw err;
           }
+          if (msg.includes("slow_down")) interval += 5;
+          await new Promise((resolve) => setTimeout(resolve, interval * 1000));
         }
-      };
-      setTimeout(poll, 5000);
+      }
+      throw new Error(t("settings.loginExpired"));
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || cancelRequestedRef.current) return;
       setLoginStatus("error");
       setLoginError(extractErrorMessage(err));
     }
-  }, [fetchAccounts]);
+  }, [finishLogin, t]);
+
+  const handleCancelLogin = useCallback(async () => {
+    cancelRequestedRef.current = true;
+    await cancelLogin();
+    if (!mountedRef.current) return;
+    setLoginStatus("idle");
+    setLoginMethod(null);
+    setUserCode(null);
+    setVerificationUri(null);
+    setAuthorizationUrl(null);
+  }, []);
 
   const [javaPath, setJavaPath] = useState(settings?.java_path ?? "");
   const [cfKey, setCfKey] = useState(settings?.curseforge_api_key ?? "");
@@ -96,13 +144,13 @@ export function Settings() {
 
   return (
     <div className="max-w-2xl space-y-8">
-      <h1 className="text-2xl font-bold text-white">Settings</h1>
+      <h1 className="text-2xl font-bold text-white">{t("settings.title")}</h1>
 
       {/* Account Section */}
       <section className="bg-slate-800 rounded-xl p-5 border border-slate-700">
         <h2 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
           <User size={20} />
-          Account
+          {t("settings.account")}
         </h2>
 
         {activeAccount ? (
@@ -165,16 +213,40 @@ export function Settings() {
             <div className="w-14 h-14 rounded-full bg-blue-600/15 flex items-center justify-center mb-4">
               <LogIn size={24} className="text-blue-400" />
             </div>
-            <p className="text-white font-medium mb-1">No account signed in</p>
+            <p className="text-white font-medium mb-1">{t("settings.noAccount")}</p>
             <p className="text-slate-400 text-sm mb-4">
-              Sign in with your Microsoft account to launch Minecraft
+              {t("settings.accountDescription")}
             </p>
           </div>
         ) : null}
 
-        {loginStatus === "pending" && userCode ? (
+        {loginStatus === "pending" && loginMethod === "browser" ? (
           <div className="bg-slate-900 rounded-lg p-4 space-y-3">
-            <p className="text-slate-300 text-sm">Enter this code in your browser:</p>
+            <div className="flex items-center gap-2 text-slate-300 text-sm">
+              <Loader2 size={14} className="animate-spin" />
+              {t("settings.browserWaiting")}
+            </div>
+            {authorizationUrl && (
+              <a
+                href={authorizationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"
+              >
+                <ExternalLink size={14} />
+                {t("settings.openMicrosoft")}
+              </a>
+            )}
+            <button
+              onClick={handleCancelLogin}
+              className="text-slate-400 hover:text-white text-sm underline"
+            >
+              {t("common.cancel")}
+            </button>
+          </div>
+        ) : loginStatus === "pending" && loginMethod === "device" && userCode ? (
+          <div className="bg-slate-900 rounded-lg p-4 space-y-3">
+            <p className="text-slate-300 text-sm">{t("settings.deviceInstructions")}</p>
             <p className="text-2xl font-mono font-bold text-white tracking-wider bg-slate-800 px-4 py-2 rounded text-center">
               {userCode}
             </p>
@@ -189,21 +261,34 @@ export function Settings() {
             </a>
             <div className="flex items-center gap-2 text-slate-400 text-sm">
               <Loader2 size={14} className="animate-spin" />
-              Waiting for you to authorize...
+              {t("settings.waitingForAuthorization")}
             </div>
+            <button
+              onClick={handleCancelLogin}
+              className="text-slate-400 hover:text-white text-sm underline"
+            >
+              {t("common.cancel")}
+            </button>
           </div>
         ) : (
           <div className="space-y-2">
             <button
-              onClick={handleLogin}
+              onClick={handleBrowserLogin}
               disabled={loginStatus === "pending"}
               className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              {activeAccount ? "Add Another Account" : "Sign in with Microsoft"}
+              {activeAccount ? t("settings.addAccount") : t("settings.signIn")}
+            </button>
+            <button
+              onClick={handleDeviceLogin}
+              disabled={loginStatus === "pending"}
+              className="text-slate-300 hover:text-white disabled:opacity-50 text-sm underline"
+            >
+              {t("settings.useDeviceCode")}
             </button>
             {loginStatus === "success" && (
               <p className="text-emerald-400 text-sm flex items-center gap-1">
-                <CheckCircle size={14} /> Signed in successfully!
+                <CheckCircle size={14} /> {t("settings.signedIn")}
               </p>
             )}
             {loginStatus === "error" && (

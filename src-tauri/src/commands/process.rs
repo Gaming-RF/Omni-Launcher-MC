@@ -17,7 +17,10 @@ pub fn is_instance_running(
 
 #[tauri::command]
 pub fn kill_game(state: State<'_, AppState>, instance_id: String) -> Result<(), AppError> {
-    state.process_manager.kill(&instance_id).map_err(AppError::Internal)?;
+    state
+        .process_manager
+        .kill(&instance_id)
+        .map_err(AppError::Internal)?;
     Ok(())
 }
 
